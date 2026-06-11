@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 60" width="180" height="60">
+  <!-- Triângulo amarelo (telhado) -->
+  <polygon points="20,38 36,14 52,38" fill="#F5C400"/>
+  <!-- Quadrado amarelo (porta) -->
+  <rect x="28" y="27" width="16" height="11" fill="#F5C400"/>
+
+  <!-- Texto VIVER DE -->
+  <text x="60" y="26" font-family="Arial Black,Arial,sans-serif" font-weight="900"
+        font-size="9" fill="#F5C400" letter-spacing="1">VIVER DE</text>
+
+  <!-- Texto OBRA -->
+  <text x="58" y="42" font-family="Arial Black,Arial,sans-serif" font-weight="900"
+        font-size="18" fill="#F5C400" letter-spacing="1">OBRA</text>
+
+  <!-- Texto ENGENHARIA -->
+  <text x="60" y="53" font-family="Arial,sans-serif" font-weight="400"
+        font-size="7" fill="#F5C400" letter-spacing="2">ENGENHARIA</text>
+</svg>

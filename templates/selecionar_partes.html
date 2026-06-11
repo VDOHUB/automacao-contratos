@@ -1,0 +1,339 @@
+{% extends "base.html" %}
+{% block title %}Partes do Contrato — {{ info.label }}{% endblock %}
+{% block content %}
+
+<div class="d-flex align-items-center gap-2 mb-4">
+  <a href="{{ url_for('escolher_tipo') }}" class="step-badge done text-decoration-none">
+    <i class="bi bi-check-lg"></i>
+  </a>
+  <span class="text-muted small">Tipo</span>
+  <i class="bi bi-chevron-right text-muted"></i>
+  <div class="step-badge">2</div>
+  <span class="fw-semibold">Partes</span>
+  <i class="bi bi-chevron-right text-muted"></i>
+  <div class="step-badge" style="background:#ccc;">3</div>
+  <span class="text-muted small">Serviços &amp; Datas</span>
+</div>
+
+<h2 class="h4 fw-bold mb-1">{{ info.label }}</h2>
+<p class="text-muted mb-4">Selecione o cliente e a executora do contrato.</p>
+
+<form method="post" enctype="multipart/form-data" id="formPartes">
+
+<!-- ── CONTRATANTE ── -->
+<div class="card mb-4">
+  <div class="card-header bg-white py-3">
+    <h5 class="mb-0 fw-bold"><i class="bi bi-person me-2 text-primary"></i>Contratante / Cliente</h5>
+  </div>
+  <div class="card-body">
+
+    {% if clientes %}
+    <label class="form-label">Selecionar cliente cadastrado</label>
+    <div class="d-flex gap-2 mb-3">
+      <select id="selectCliente" class="form-select" name="cliente_id">
+        <option value="{{ saved_cli_id }}" {% if not saved_cli_id %}selected{% endif %}>
+          — Novo cliente / preencher manualmente —
+        </option>
+        {% for c in clientes %}
+        <option value="{{ c.id }}"
+                data-nome="{{ c.nome }}"
+                data-nacionalidade="{{ c.nacionalidade }}"
+                data-estado-civil="{{ c.estado_civil }}"
+                data-profissao="{{ c.profissao or '' }}"
+                data-cpf="{{ c.cpf or '' }}"
+                data-rg="{{ c.rg or '' }}"
+                data-uf-rg="{{ c.uf_rg or '' }}"
+                data-logradouro="{{ c.logradouro or '' }}"
+                data-complemento="{{ c.complemento or '' }}"
+                {% if c.id|string == saved_cli_id %}selected{% endif %}>
+          {{ c.nome }} {% if c.cpf %}— {{ c.cpf }}{% endif %}
+        </option>
+        {% endfor %}
+      </select>
+      <a href="{{ url_for('novo_cliente') }}" target="_blank" class="btn btn-outline-secondary text-nowrap">
+        <i class="bi bi-person-plus"></i>
+      </a>
+    </div>
+    <div id="clienteSelecionado" class="alert alert-success py-2 {{ '' if saved_cli_id else 'd-none' }}">
+      <i class="bi bi-check-circle me-2"></i>
+      <span id="clienteSelecionadoNome">{% if saved_cli_id %}{% for c in clientes %}{% if c.id|string == saved_cli_id %}{{ c.nome }}{% endif %}{% endfor %}{% endif %}</span>
+      <button type="button" class="btn-close float-end" id="btnLimparCliente"></button>
+    </div>
+    {% endif %}
+
+    <!-- Campos manuais (aparecem quando não há cliente selecionado) -->
+    <div id="camposCliente" class="{{ 'd-none' if clientes and not saved_cli_form else '' }}">
+      <p class="section-title mt-3">Dados do contratante</p>
+
+      <!-- OCR -->
+      <div class="mb-3 p-3 bg-light rounded">
+        <p class="small fw-semibold mb-2"><i class="bi bi-magic me-1"></i>Preencher via documento</p>
+        <div class="d-flex gap-2 flex-wrap align-items-center">
+          <input type="file" name="docs_cliente" accept="image/*,application/pdf" multiple
+                 class="form-control form-control-sm" style="max-width:300px;">
+          <button type="submit" name="action" value="ocr_cliente" class="btn btn-sm btn-outline-primary">
+            <i class="bi bi-magic me-1"></i> Extrair OCR
+          </button>
+        </div>
+      </div>
+
+      <div class="row g-2">
+        <div class="col-md-6">
+          <label class="form-label">Nome completo</label>
+          <input type="text" name="nome_contratante" class="form-control"
+                 value="{{ ocr_cliente.get('nome', saved_cli_form.get('nome_contratante', '')) }}">
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Nacionalidade</label>
+          <input type="text" name="nacionalidade_contratante" class="form-control"
+                 value="{{ ocr_cliente.get('nacionalidade', saved_cli_form.get('nacionalidade_contratante', 'brasileiro(a)')) }}">
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Estado Civil</label>
+          <select name="estado_civil_contratante" class="form-select">
+            {% set ec_atual = saved_cli_form.get('estado_civil_contratante', '') %}
+            {% for ec in ['solteiro(a)','casado(a)','divorciado(a)','viúvo(a)','separado(a)'] %}
+            <option value="{{ ec }}" {{ 'selected' if ec == ec_atual }}>{{ ec }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Profissão</label>
+          <input type="text" name="profissao_contratante" class="form-control"
+                 value="{{ saved_cli_form.get('profissao_contratante', '') }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">CPF</label>
+          <input type="text" name="cpf_contratante" class="form-control" placeholder="000.000.000-00"
+                 value="{{ ocr_cliente.get('cpf', saved_cli_form.get('cpf_contratante', '')) }}">
+        </div>
+        <div class="col-6 col-md-2">
+          <label class="form-label">RG</label>
+          <input type="text" name="rg_contratante" class="form-control"
+                 value="{{ ocr_cliente.get('rg', saved_cli_form.get('rg_contratante', '')) }}">
+        </div>
+        <div class="col-6 col-md-2">
+          <label class="form-label">UF RG</label>
+          <input type="text" name="uf_rg_contratante" class="form-control" maxlength="2" placeholder="GO"
+                 value="{{ saved_cli_form.get('uf_rg_contratante', '') }}">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Logradouro</label>
+          <input type="text" name="logradouro_contratante" class="form-control"
+                 value="{{ ocr_cliente.get('logradouro', saved_cli_form.get('logradouro_contratante', '')) }}">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Complemento / Bairro / CEP</label>
+          <input type="text" name="complemento_contratante" class="form-control"
+                 value="{{ saved_cli_form.get('complemento_contratante', '') }}">
+        </div>
+      </div>
+
+      <div class="form-check mt-3">
+        <input class="form-check-input" type="checkbox" name="salvar_cliente" value="1" id="checkSalvarCliente">
+        <label class="form-check-label fw-semibold text-success" for="checkSalvarCliente">
+          <i class="bi bi-person-check me-1"></i> Salvar este cliente no cadastro para usar em futuros contratos
+        </label>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── EXECUTORA ── -->
+<div class="card mb-4">
+  <div class="card-header bg-white py-3">
+    <h5 class="mb-0 fw-bold"><i class="bi bi-person-gear me-2 text-warning"></i>Contratada / Executora</h5>
+  </div>
+  <div class="card-body">
+
+    {% if executoras %}
+    <label class="form-label">Selecionar executora cadastrada</label>
+    <div class="d-flex gap-2 mb-3">
+      <select id="selectExecutora" class="form-select" name="executora_id">
+        <option value="{{ saved_exec_id }}" {% if not saved_exec_id %}selected{% endif %}>
+          — Nova executora / preencher manualmente —
+        </option>
+        {% for e in executoras %}
+        <option value="{{ e.id }}"
+                data-nome="{{ e.nome }}"
+                data-tipo="{{ e.tipo_pessoa or 'PF' }}"
+                data-cpf="{{ e.cpf or '' }}"
+                data-cnpj="{{ e.cnpj or '' }}"
+                data-endereco="{{ e.endereco or '' }}"
+                {% if e.id|string == saved_exec_id %}selected{% endif %}>
+          {{ e.nome }} ({{ e.tipo_pessoa or 'PF' }}){% if e.cpf %} — {{ e.cpf }}{% endif %}{% if e.cnpj %} — {{ e.cnpj }}{% endif %}
+        </option>
+        {% endfor %}
+      </select>
+      <a href="{{ url_for('nova_executora') }}" target="_blank" class="btn btn-outline-secondary text-nowrap">
+        <i class="bi bi-person-plus"></i>
+      </a>
+    </div>
+    <div id="executoraSelecionada" class="alert alert-success py-2 {{ '' if saved_exec_id else 'd-none' }}">
+      <i class="bi bi-check-circle me-2"></i>
+      <span id="executoraSelecionadaNome">{% if saved_exec_id %}{% for e in executoras %}{% if e.id|string == saved_exec_id %}{{ e.nome }}{% endif %}{% endfor %}{% endif %}</span>
+      <button type="button" class="btn-close float-end" id="btnLimparExecutora"></button>
+    </div>
+    {% endif %}
+
+    <div id="camposExecutora" class="{{ 'd-none' if executoras and not saved_exec_form else '' }}">
+      <p class="section-title mt-3">Dados da executora</p>
+
+      <!-- OCR -->
+      <div class="mb-3 p-3 bg-light rounded">
+        <p class="small fw-semibold mb-2"><i class="bi bi-magic me-1"></i>Preencher via documento</p>
+        <div class="d-flex gap-2 flex-wrap align-items-center">
+          <input type="file" name="docs_executora" accept="image/*,application/pdf" multiple
+                 class="form-control form-control-sm" style="max-width:300px;">
+          <button type="submit" name="action" value="ocr_executora" class="btn btn-sm btn-outline-primary">
+            <i class="bi bi-magic me-1"></i> Extrair OCR
+          </button>
+        </div>
+      </div>
+
+      <!-- Toggle PF / PJ -->
+      {% set tipo_exec = saved_exec_form.get('tipo_pessoa_exec', 'PF') %}
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Tipo de pessoa</label>
+        <div class="btn-group w-100" role="group">
+          <input type="radio" class="btn-check" name="tipo_pessoa_exec" id="execPF" value="PF"
+                 {{ 'checked' if tipo_exec != 'PJ' else '' }}>
+          <label class="btn btn-outline-primary" for="execPF">
+            <i class="bi bi-person me-1"></i> Pessoa Física (CPF)
+          </label>
+          <input type="radio" class="btn-check" name="tipo_pessoa_exec" id="execPJ" value="PJ"
+                 {{ 'checked' if tipo_exec == 'PJ' else '' }}>
+          <label class="btn btn-outline-primary" for="execPJ">
+            <i class="bi bi-building me-1"></i> Pessoa Jurídica (CNPJ)
+          </label>
+        </div>
+      </div>
+
+      <div class="row g-2">
+        <div class="col-md-6">
+          <label class="form-label" id="labelNomeExec">
+            <span id="labelNomeExecTxt">Nome completo</span>
+          </label>
+          <input type="text" name="nome_executora" class="form-control"
+                 value="{{ ocr_executora.get('nome', saved_exec_form.get('nome_executora', '')) }}">
+        </div>
+        <div class="col-md-4" id="campoCPFExec">
+          <label class="form-label">CPF</label>
+          <input type="text" name="cpf_executora" class="form-control" placeholder="000.000.000-00"
+                 value="{{ ocr_executora.get('cpf', saved_exec_form.get('cpf_executora', '')) }}">
+        </div>
+        <div class="col-md-4 {{ 'd-none' if tipo_exec != 'PJ' else '' }}" id="campoCNPJExec">
+          <label class="form-label">CNPJ</label>
+          <input type="text" name="cnpj_executora" class="form-control" placeholder="00.000.000/0000-00"
+                 value="{{ ocr_executora.get('cnpj', saved_exec_form.get('cnpj_executora', '')) }}">
+        </div>
+        <div class="col-12">
+          <label class="form-label">Endereço</label>
+          <input type="text" name="endereco_executora" class="form-control"
+                 value="{{ ocr_executora.get('logradouro', saved_exec_form.get('endereco_executora', '')) }}">
+        </div>
+      </div>
+
+      <div class="form-check mt-3">
+        <input class="form-check-input" type="checkbox" name="salvar_executora" value="1" id="checkSalvarExecutora">
+        <label class="form-check-label fw-semibold text-success" for="checkSalvarExecutora">
+          <i class="bi bi-person-check me-1"></i> Salvar esta executora no cadastro para usar em futuros contratos
+        </label>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Navegação -->
+<div class="d-grid gap-2 d-md-flex justify-content-md-end">
+  <a href="{{ url_for('escolher_tipo') }}" class="btn btn-outline-secondary">
+    <i class="bi bi-arrow-left me-1"></i> Voltar
+  </a>
+  <button type="submit" name="action" value="avancar" class="btn btn-primary btn-lg">
+    Avançar <i class="bi bi-arrow-right ms-1"></i>
+  </button>
+</div>
+
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+var selectCliente  = document.getElementById('selectCliente');
+var selectExecutora = document.getElementById('selectExecutora');
+var radioPF = document.getElementById('execPF');
+var radioPJ = document.getElementById('execPJ');
+
+// ── Toggle PF/PJ executora ──
+function aplicarTipoExec() {
+  var isPJ = radioPJ && radioPJ.checked;
+  var campoCPF  = document.getElementById('campoCPFExec');
+  var campoCNPJ = document.getElementById('campoCNPJExec');
+  var label     = document.getElementById('labelNomeExecTxt');
+  if (campoCPF)  campoCPF.classList.toggle('d-none', isPJ);
+  if (campoCNPJ) campoCNPJ.classList.toggle('d-none', !isPJ);
+  if (label) label.textContent = isPJ ? 'Razão Social' : 'Nome completo';
+}
+if (radioPF) radioPF.addEventListener('change', aplicarTipoExec);
+if (radioPJ) radioPJ.addEventListener('change', aplicarTipoExec);
+aplicarTipoExec();
+
+// ── Cliente dropdown ──
+function mostrarCamposCliente(mostrar) {
+  var el = document.getElementById('camposCliente');
+  if (el) el.classList.toggle('d-none', !mostrar);
+}
+
+var btnLimparCliente = document.getElementById('btnLimparCliente');
+if (btnLimparCliente) {
+  btnLimparCliente.addEventListener('click', function() {
+    if (selectCliente) selectCliente.value = '';
+    document.getElementById('clienteSelecionado').classList.add('d-none');
+    mostrarCamposCliente(true);
+  });
+}
+
+if (selectCliente) {
+  selectCliente.addEventListener('change', function() {
+    var opt = this.options[this.selectedIndex];
+    if (opt.value) {
+      document.getElementById('clienteSelecionadoNome').textContent = opt.dataset.nome || opt.text;
+      document.getElementById('clienteSelecionado').classList.remove('d-none');
+      mostrarCamposCliente(false);
+    } else {
+      document.getElementById('clienteSelecionado').classList.add('d-none');
+      mostrarCamposCliente(true);
+    }
+  });
+}
+
+// ── Executora dropdown ──
+function mostrarCamposExecutora(mostrar) {
+  var el = document.getElementById('camposExecutora');
+  if (el) el.classList.toggle('d-none', !mostrar);
+}
+
+var btnLimparExecutora = document.getElementById('btnLimparExecutora');
+if (btnLimparExecutora) {
+  btnLimparExecutora.addEventListener('click', function() {
+    if (selectExecutora) selectExecutora.value = '';
+    document.getElementById('executoraSelecionada').classList.add('d-none');
+    mostrarCamposExecutora(true);
+  });
+}
+
+if (selectExecutora) {
+  selectExecutora.addEventListener('change', function() {
+    var opt = this.options[this.selectedIndex];
+    if (opt.value) {
+      document.getElementById('executoraSelecionadaNome').textContent = opt.dataset.nome || opt.text;
+      document.getElementById('executoraSelecionada').classList.remove('d-none');
+      mostrarCamposExecutora(false);
+    } else {
+      document.getElementById('executoraSelecionada').classList.add('d-none');
+      mostrarCamposExecutora(true);
+    }
+  });
+}
+</script>
+{% endblock %}

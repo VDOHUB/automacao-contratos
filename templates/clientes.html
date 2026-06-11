@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Clientes{% endblock %}
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <h1 class="h3 mb-0 fw-bold"><i class="bi bi-people me-2 text-primary"></i>Clientes</h1>
+  <a href="{{ url_for('novo_cliente') }}" class="btn btn-primary">
+    <i class="bi bi-person-plus me-1"></i> Novo Cliente
+  </a>
+</div>
+
+{% if clientes %}
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Nome</th>
+            <th class="d-none d-md-table-cell">CPF</th>
+            <th class="d-none d-md-table-cell">Profissão</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in clientes %}
+          <tr class="{{ '' if c.ativo else 'text-muted' }}">
+            <td>
+              <div class="fw-semibold">{{ c.nome }}</div>
+              <small class="text-muted d-md-none">{{ c.cpf or '' }}</small>
+            </td>
+            <td class="d-none d-md-table-cell text-muted">{{ c.cpf or '—' }}</td>
+            <td class="d-none d-md-table-cell text-muted">{{ c.profissao or '—' }}</td>
+            <td>
+              {% if c.ativo %}
+                <span class="badge bg-success-subtle text-success">Ativo</span>
+              {% else %}
+                <span class="badge bg-secondary-subtle text-secondary">Inativo</span>
+              {% endif %}
+            </td>
+            <td class="text-end">
+              <div class="d-flex gap-1 justify-content-end">
+                <a href="{{ url_for('dashboard_cliente', cid=c.id) }}"
+                   class="btn btn-sm btn-outline-secondary" title="Dashboard">
+                  <i class="bi bi-speedometer2"></i>
+                </a>
+                <a href="{{ url_for('historico_cliente', cid=c.id) }}"
+                   class="btn btn-sm btn-outline-secondary" title="Histórico">
+                  <i class="bi bi-clock-history"></i>
+                </a>
+                <a href="{{ url_for('editar_cliente', cid=c.id) }}"
+                   class="btn btn-sm btn-outline-secondary" title="Editar">
+                  <i class="bi bi-pencil"></i>
+                </a>
+                <form method="post" action="{{ url_for('excluir_cliente', cid=c.id) }}"
+                      class="d-inline" onsubmit="return confirm('Remover cliente?')">
+                  <button class="btn btn-sm btn-outline-danger" title="Remover">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="card">
+  <div class="card-body text-center py-5 text-muted">
+    <i class="bi bi-people fs-1 d-block mb-3"></i>
+    <p>Nenhum cliente cadastrado ainda.</p>
+    <a href="{{ url_for('novo_cliente') }}" class="btn btn-primary">Cadastrar primeiro cliente</a>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

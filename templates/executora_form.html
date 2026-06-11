@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Editar' if action == 'editar' else 'Nova' }} Executora{% endblock %}
+{% block content %}
+<div class="d-flex align-items-center gap-3 mb-4">
+  <a href="{{ url_for('executoras') }}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left"></i>
+  </a>
+  <h1 class="h3 mb-0 fw-bold">
+    {{ 'Editar Executora' if action == 'editar' else 'Nova Executora' }}
+  </h1>
+</div>
+
+{% if action == 'nova' %}
+<div class="card mb-4">
+  <div class="card-body">
+    <p class="section-title"><i class="bi bi-magic me-2"></i>Preencher via documento (opcional)</p>
+    <p class="text-muted small mb-3">Envie uma foto do RG, CNH ou cartão CNPJ para preencher automaticamente.</p>
+    <form method="post" enctype="multipart/form-data">
+      <input type="hidden" name="action" value="ocr">
+      <div class="d-flex gap-2 align-items-center flex-wrap">
+        <input type="file" name="documentos" accept="image/*" multiple class="form-control" style="max-width:320px;">
+        <button type="submit" class="btn btn-outline-primary">
+          <i class="bi bi-magic me-1"></i> Extrair dados
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+<div class="card" style="max-width:620px;">
+  <div class="card-body">
+    <form method="post">
+      <input type="hidden" name="action" value="salvar">
+
+      <!-- Toggle PF / PJ -->
+      <div class="mb-4">
+        <label class="form-label fw-semibold">Tipo de pessoa</label>
+        <div class="btn-group w-100" role="group">
+          <input type="radio" class="btn-check" name="tipo_pessoa" id="tipoPF" value="PF"
+                 {{ 'checked' if not executora or executora.tipo_pessoa == 'PF' else '' }}>
+          <label class="btn btn-outline-primary" for="tipoPF">
+            <i class="bi bi-person me-1"></i> Pessoa Física (CPF)
+          </label>
+
+          <input type="radio" class="btn-check" name="tipo_pessoa" id="tipoPJ" value="PJ"
+                 {{ 'checked' if executora and executora.tipo_pessoa == 'PJ' else '' }}>
+          <label class="btn btn-outline-primary" for="tipoPJ">
+            <i class="bi bi-building me-1"></i> Pessoa Jurídica (CNPJ)
+          </label>
+        </div>
+      </div>
+
+      <div class="row g-3">
+        <!-- Nome: muda label conforme tipo -->
+        <div class="col-12">
+          <label class="form-label" id="labelNome">
+            <span id="labelNomeTexto">Nome completo</span> *
+          </label>
+          <input type="text" name="nome" class="form-control" required
+                 placeholder=""
+                 id="inputNome"
+                 value="{{ ocr_dados.get('nome','') or (executora.nome if executora else '') }}">
+        </div>
+
+        <!-- CPF (PF) -->
+        <div class="col-md-6" id="campoCPF">
+          <label class="form-label">CPF</label>
+          <input type="text" name="cpf" id="inputCPF" class="form-control" placeholder="000.000.000-00"
+                 maxlength="14" inputmode="numeric"
+                 value="{{ ocr_dados.get('cpf','') or (executora.cpf if executora else '') }}">
+        </div>
+
+        <!-- CNPJ (PJ) -->
+        <div class="col-md-6 d-none" id="campoCNPJ">
+          <label class="form-label">CNPJ</label>
+          <input type="text" name="cnpj" id="inputCNPJ" class="form-control" placeholder="00.000.000/0000-00"
+                 maxlength="18" inputmode="numeric"
+                 value="{{ executora.cnpj if executora else '' }}">
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label">Telefone</label>
+          <input type="text" name="telefone" id="inputTel" class="form-control" placeholder="(62) 9 0000-0000"
+                 maxlength="16" inputmode="numeric"
+                 value="{{ executora.telefone if executora else '' }}">
+        </div>
+
+        <div class="col-12">
+          <label class="form-label">Endereço completo</label>
+          <input type="text" name="endereco" class="form-control"
+                 placeholder="Rua, número, bairro, cidade, CEP..."
+                 value="{{ ocr_dados.get('logradouro','') or (executora.endereco if executora else '') }}">
+        </div>
+      </div>
+
+      <div class="d-flex gap-2 justify-content-end mt-4">
+        <a href="{{ url_for('executoras') }}" class="btn btn-outline-secondary">Cancelar</a>
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-check-lg me-1"></i>
+          {{ 'Salvar alterações' if action == 'editar' else 'Cadastrar executora' }}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+var radioPF = document.getElementById('tipoPF');
+var radioPJ = document.getElementById('tipoPJ');
+var campoCPF = document.getElementById('campoCPF');
+var campoCNPJ = document.getElementById('campoCNPJ');
+var labelNome = document.getElementById('labelNomeTexto');
+var inputNome = document.getElementById('inputNome');
+
+function aplicarTipo() {
+  var isPJ = radioPJ.checked;
+  campoCPF.classList.toggle('d-none', isPJ);
+  campoCNPJ.classList.toggle('d-none', !isPJ);
+  labelNome.textContent = isPJ ? 'Razão Social' : 'Nome completo';
+  inputNome.placeholder = isPJ ? 'Nome fantasia / Razão Social' : 'Nome completo do executora';
+}
+
+radioPF.addEventListener('change', aplicarTipo);
+radioPJ.addEventListener('change', aplicarTipo);
+aplicarTipo();
+
+// ── Máscaras ──────────────────────────────────────────────────────────────
+function mascararCPF(v) {
+  v = v.replace(/\D/g,'').slice(0,11);
+  return v.replace(/(\d{3})(\d)/,'$1.$2')
+           .replace(/(\d{3})(\d)/,'$1.$2')
+           .replace(/(\d{3})(\d{1,2})$/,'$1-$2');
+}
+function mascararCNPJ(v) {
+  v = v.replace(/\D/g,'').slice(0,14);
+  return v.replace(/(\d{2})(\d)/,'$1.$2')
+           .replace(/(\d{3})(\d)/,'$1.$2')
+           .replace(/(\d{3})(\d)/,'$1/$2')
+           .replace(/(\d{4})(\d{1,2})$/,'$1-$2');
+}
+function mascararTel(v) {
+  v = v.replace(/\D/g,'').slice(0,11);
+  if (v.length <= 10)
+    return v.replace(/(\d{2})(\d{4})(\d{0,4})/,'($1) $2-$3');
+  return v.replace(/(\d{2})(\d{5})(\d{0,4})/,'($1) $2-$3');
+}
+
+document.getElementById('inputCPF').addEventListener('input', function() {
+  this.value = mascararCPF(this.value);
+});
+document.getElementById('inputCNPJ').addEventListener('input', function() {
+  this.value = mascararCNPJ(this.value);
+});
+document.getElementById('inputTel').addEventListener('input', function() {
+  this.value = mascararTel(this.value);
+});
+</script>
+{% endblock %}

@@ -1,0 +1,490 @@
+{% extends "base.html" %}
+{% block title %}Preencher Contrato — {{ info.label }}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-2 mb-4">
+  <div class="step-badge done"><i class="bi bi-check-lg"></i></div>
+  <span class="text-muted small">Tipo</span>
+  <i class="bi bi-chevron-right text-muted"></i>
+  <div class="step-badge done"><i class="bi bi-check-lg"></i></div>
+  <span class="text-muted small">Partes</span>
+  <i class="bi bi-chevron-right text-muted"></i>
+  <div class="step-badge">3</div>
+  <span class="fw-semibold">Serviços &amp; Datas</span>
+</div>
+
+<h2 class="h4 fw-bold mb-1">{{ info.label }}</h2>
+<p class="text-muted mb-4">Adicione os serviços, preencha as datas e gere o contrato.</p>
+
+<form method="post">
+
+{# Campos ocultos das partes #}
+{% for field in ['nome_contratante','nacionalidade_contratante','estado_civil_contratante',
+                  'profissao_contratante','cpf_contratante','rg_contratante','uf_rg_contratante',
+                  'logradouro_contratante','complemento_contratante',
+                  'nome_executora','tipo_pessoa_exec','cpf_executora','cnpj_executora','endereco_executora'] %}
+<input type="hidden" name="{{ field }}" value="{{ dados.get(field,'') }}">
+{% endfor %}
+
+<!-- ── RESUMO DAS PARTES ── -->
+<div class="card mb-4">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <p class="section-title mb-0"><i class="bi bi-people me-2"></i>Partes do Contrato</p>
+      <a href="{{ url_for('selecionar_partes', tipo=tipo) }}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-pencil me-1"></i> Alterar
+      </a>
+    </div>
+    <div class="row g-3">
+      <div class="col-md-6">
+        <p class="text-muted small mb-1 fw-bold">CONTRATANTE / CLIENTE</p>
+        <p class="mb-1 fw-semibold">{{ dados.get('nome_contratante','—') }}</p>
+        <p class="text-muted small mb-0">
+          CPF: {{ dados.get('cpf_contratante','—') }}
+          {% if dados.get('rg_contratante') %} | RG: {{ dados.get('rg_contratante') }}{% endif %}
+        </p>
+        {% if dados.get('logradouro_contratante') %}
+        <p class="text-muted small mb-0">
+          {{ dados.get('logradouro_contratante') }}{% if dados.get('complemento_contratante') %}, {{ dados.get('complemento_contratante') }}{% endif %}
+        </p>
+        {% endif %}
+      </div>
+      <div class="col-md-6">
+        <p class="text-muted small mb-1 fw-bold">CONTRATADA / EXECUTORA</p>
+        <p class="mb-1 fw-semibold">{{ dados.get('nome_executora','—') }}</p>
+        <p class="text-muted small mb-0">
+          {% if dados.get('cnpj_executora') %}CNPJ: {{ dados.get('cnpj_executora') }}
+          {% elif dados.get('cpf_executora') %}CPF: {{ dados.get('cpf_executora') }}
+          {% else %}—{% endif %}
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── VALOR TOTAL DA OBRA (para cálculo percentual) ── -->
+<div class="card mb-4">
+  <div class="card-body">
+    <p class="section-title"><i class="bi bi-building me-2"></i>Valor Total da Obra</p>
+    <div class="row g-3 align-items-end">
+      <div class="col-md-4">
+        <label class="form-label">Macro da obra (R$)</label>
+        <input type="text" id="valor_total_obra" class="form-control"
+               placeholder="Ex: 50.000,00"
+               oninput="recalcularServicos()">
+        <div class="form-text">Usado para calcular serviços com percentual cadastrado.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── SERVIÇOS ── -->
+<div class="card mb-4">
+  <div class="card-body">
+    <p class="section-title"><i class="bi bi-list-check me-2"></i>Serviços Contratados</p>
+
+    {% if servicos_catalogo %}
+    <div class="row g-2 mb-3 align-items-end">
+      <div class="col">
+        <label class="form-label">Adicionar do catálogo</label>
+        <select id="catalogo" class="form-select">
+          <option value="">— Selecione um serviço —</option>
+          {% for s in servicos_catalogo %}
+          <option value="{{ s.id }}"
+                  data-desc="{{ s.descricao }}"
+                  data-unidade="{{ s.unidade }}"
+                  data-preco="{{ s.preco_padrao if s.preco_padrao else '' }}"
+                  data-percentual="{{ s.percentual_padrao if s.percentual_padrao else '' }}">
+            {{ s.nome }}{% if s.categoria %} ({{ s.categoria }}){% endif %}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-auto">
+        <button type="button" class="btn btn-outline-primary" id="btnAddCatalogo">
+          <i class="bi bi-plus-lg"></i> Adicionar
+        </button>
+      </div>
+    </div>
+    {% else %}
+    <div class="alert alert-info py-2 mb-3">
+      <i class="bi bi-info-circle me-2"></i>
+      Catálogo vazio.
+      <a href="{{ url_for('novo_servico') }}" target="_blank" class="alert-link">Cadastre serviços</a>
+      ou use "Serviço avulso".
+    </div>
+    {% endif %}
+
+    <div id="servicosLista"></div>
+    <div class="text-center py-3 text-muted" id="emptyMsg">
+      <i class="bi bi-inbox d-block fs-4 mb-1"></i>
+      Nenhum serviço adicionado ainda.
+    </div>
+
+    <button type="button" class="btn btn-outline-success mt-2" id="btnAvulso">
+      <i class="bi bi-pencil-square me-1"></i> Adicionar serviço avulso
+    </button>
+  </div>
+</div>
+
+<!-- ── DATAS ── -->
+<div class="card mb-4">
+  <div class="card-body">
+    <p class="section-title"><i class="bi bi-calendar3 me-2"></i>Prazo de Execução</p>
+    <div class="row g-3">
+      <div class="col-md-3">
+        <label class="form-label">Data de Início</label>
+        <input type="text" name="data_inicio" id="data_inicio" class="form-control datepicker"
+               placeholder="DD/MM/AAAA" autocomplete="off"
+               value="{{ dados.get('data_inicio','') }}">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Data de Conclusão</label>
+        <input type="text" name="data_conclusao" id="data_conclusao" class="form-control datepicker"
+               placeholder="DD/MM/AAAA" autocomplete="off"
+               value="{{ dados.get('data_conclusao','') }}">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Prazo Estimado</label>
+        <input type="text" name="prazo_execucao" id="prazo_execucao" class="form-control"
+               placeholder="calculado automaticamente"
+               value="{{ dados.get('prazo_execucao','') }}">
+        <div class="form-text">Calculado ao preencher as datas, ou edite manualmente.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── MULTA E ASSINATURA ── -->
+<div class="card mb-4">
+  <div class="card-body">
+    <p class="section-title"><i class="bi bi-pen me-2"></i>Multa e Assinatura</p>
+    <div class="row g-3">
+      <div class="col-md-4">
+        <label class="form-label">Valor da multa</label>
+        <input type="text" name="valor_multa_fmt" id="valor_multa_fmt" class="form-control" placeholder="R$ 3.000,00"
+               value="{{ dados.get('valor_multa_fmt','') }}" oninput="autoMultaExtenso()">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Multa por extenso <small class="text-muted">(automático)</small></label>
+        <input type="text" name="valor_multa_extenso" id="valor_multa_extenso" class="form-control" placeholder="Três mil reais"
+               value="{{ dados.get('valor_multa_extenso','') }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Cidade de assinatura</label>
+        <input type="text" name="cidade_assinatura" class="form-control"
+               value="{{ dados.get('cidade_assinatura','Anápolis-GO') }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Data de assinatura</label>
+        <input type="text" name="data_assinatura" id="data_assinatura" class="form-control"
+               placeholder="22 de Janeiro de 2026" autocomplete="off"
+               value="{{ dados.get('data_assinatura','') }}">
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="d-grid gap-2 d-md-flex justify-content-md-end">
+  <a href="{{ url_for('selecionar_partes', tipo=tipo) }}" class="btn btn-outline-secondary">
+    <i class="bi bi-arrow-left me-1"></i> Voltar
+  </a>
+  <button type="submit" class="btn btn-primary btn-lg">
+    <i class="bi bi-file-earmark-arrow-down me-1"></i> Gerar Contrato
+  </button>
+</div>
+
+</form>
+{% endblock %}
+
+{% block scripts %}
+<!-- Flatpickr -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/pt.js"></script>
+<script>
+// ── Flatpickr ──────────────────────────────────────────────────────────────
+var fpInicio = flatpickr('#data_inicio', {
+  locale: 'pt', dateFormat: 'd/m/Y', allowInput: true,
+  onChange: calcularPrazo
+});
+var fpConclusao = flatpickr('#data_conclusao', {
+  locale: 'pt', dateFormat: 'd/m/Y', allowInput: true,
+  onChange: calcularPrazo
+});
+
+var mesesPT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+               'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+flatpickr('#data_assinatura', {
+  locale: 'pt',
+  allowInput: true,
+  dateFormat: 'Y-m-d',
+  formatDate: function(date) {
+    return date.getDate() + ' de ' + mesesPT[date.getMonth()] + ' de ' + date.getFullYear();
+  },
+  parseDate: function(str) {
+    // Try "22 de Janeiro de 2026" or "22/01/2026"
+    var m = str.match(/^(\d{1,2})\s+de\s+(\w+)\s+de\s+(\d{4})$/i);
+    if (m) {
+      var mon = mesesPT.findIndex(function(n){ return n.toLowerCase()===m[2].toLowerCase(); });
+      if (mon>=0) return new Date(parseInt(m[3]), mon, parseInt(m[1]));
+    }
+    var p = str.split('/');
+    if (p.length===3) return new Date(parseInt(p[2]), parseInt(p[1])-1, parseInt(p[0]));
+    return new Date(str);
+  }
+});
+
+// ── Multa por extenso ──────────────────────────────────────────────────────
+var unidades_ex  = ['','um','dois','três','quatro','cinco','seis','sete','oito','nove',
+                    'dez','onze','doze','treze','quatorze','quinze','dezesseis','dezessete','dezoito','dezenove'];
+var dezenas_ex   = ['','','vinte','trinta','quarenta','cinquenta','sessenta','setenta','oitenta','noventa'];
+var centenas_ex  = ['','cem','duzentos','trezentos','quatrocentos','quinhentos',
+                    'seiscentos','setecentos','oitocentos','novecentos'];
+
+function menorQMil(n) {
+  if (n === 0) return '';
+  if (n <= 19) return unidades_ex[n];
+  if (n < 100) {
+    var d = Math.floor(n/10), u = n%10;
+    return dezenas_ex[d] + (u ? ' e ' + unidades_ex[u] : '');
+  }
+  if (n === 100) return 'cem';
+  var c = Math.floor(n/100), resto = n%100;
+  return centenas_ex[c] + (resto ? ' e ' + menorQMil(resto) : '');
+}
+
+function numeroParaExtenso(valor) {
+  if (!valor || isNaN(valor)) return '';
+  var inteiro = Math.floor(valor);
+  var cents   = Math.round((valor - inteiro) * 100);
+  var partes  = [];
+
+  if (inteiro === 0 && cents === 0) return 'zero reais';
+
+  if (inteiro >= 1000000) {
+    var mi = Math.floor(inteiro/1000000);
+    partes.push(menorQMil(mi) + (mi===1?' milhão':' milhões'));
+    inteiro %= 1000000;
+  }
+  if (inteiro >= 1000) {
+    var mil = Math.floor(inteiro/1000);
+    partes.push(mil===1 ? 'mil' : menorQMil(mil) + ' mil');
+    inteiro %= 1000;
+  }
+  if (inteiro > 0) partes.push(menorQMil(inteiro));
+
+  var texto = partes.join(' e ');
+  var totalInteiro = Math.floor(valor);
+  texto += totalInteiro === 1 ? ' real' : ' reais';
+  if (cents > 0) {
+    texto += ' e ' + menorQMil(cents) + (cents===1?' centavo':' centavos');
+  }
+  // Capitalizar primeira letra
+  return texto.charAt(0).toUpperCase() + texto.slice(1);
+}
+
+function autoMultaExtenso() {
+  var raw = document.getElementById('valor_multa_fmt').value;
+  var limpo = raw.replace(/[R$\s]/g,'').replace(/\./g,'').replace(',','.');
+  var num = parseFloat(limpo);
+  var el  = document.getElementById('valor_multa_extenso');
+  if (num > 0) el.value = numeroParaExtenso(num);
+}
+
+// ── Calcular prazo em semanas ───────────────────────────────────────────────
+function parseDataBR(str) {
+  if (!str) return null;
+  var p = str.split('/');
+  if (p.length !== 3) return null;
+  return new Date(parseInt(p[2]), parseInt(p[1])-1, parseInt(p[0]));
+}
+
+function calcularPrazo() {
+  var di = parseDataBR(document.getElementById('data_inicio').value);
+  var dc = parseDataBR(document.getElementById('data_conclusao').value);
+  if (!di || !dc || dc <= di) return;
+  var dias = Math.round((dc - di) / 86400000);
+  var semanas = Math.round(dias / 7);
+  var prazoEl = document.getElementById('prazo_execucao');
+  prazoEl.value = semanas + (semanas === 1 ? ' semana' : ' semanas');
+}
+
+// ── Formas de pagamento disponíveis ────────────────────────────────────────
+var formasPagamento = [
+  {% for f in formas_pagamento %}"{{ f.descricao }}"{% if not loop.last %},{% endif %}{% endfor %}
+];
+
+// ── Gerenciador de serviços ────────────────────────────────────────────────
+var servicoCount = 0;
+
+function getValorObra() {
+  var v = document.getElementById('valor_total_obra').value;
+  return parseFloat(v.replace(/\./g,'').replace(',','.')) || 0;
+}
+
+function recalcularServicos() {
+  var obra = getValorObra();
+  document.querySelectorAll('.servico-row').forEach(function(row) {
+    var perc = parseFloat(row.dataset.percentual || '0');
+    if (!perc || !obra) return;
+    var val = obra * perc / 100;
+    var valorInput = row.querySelector('[name="servico_valor[]"]');
+    if (valorInput) valorInput.value = 'R$ ' + val.toLocaleString('pt-BR', {minimumFractionDigits:2,maximumFractionDigits:2});
+  });
+}
+
+function atualizarEmpty() {
+  var rows = document.querySelectorAll('#servicosLista .servico-row');
+  document.getElementById('emptyMsg').style.display = rows.length > 0 ? 'none' : 'block';
+}
+
+function formatarPreco(valor) {
+  var num = parseFloat(valor);
+  if (isNaN(num) || num === 0) return '';
+  return 'R$ ' + num.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
+function adicionarServico(desc, unidade, valor, percentual) {
+  document.getElementById('emptyMsg').style.display = 'none';
+  var row = document.createElement('div');
+  row.className = 'servico-row border rounded p-2 mb-2 bg-white';
+  row.dataset.percentual = percentual || '';
+
+  // Calcular valor pelo percentual se houver
+  var valorFinal = valor;
+  if (percentual && getValorObra()) {
+    valorFinal = getValorObra() * parseFloat(percentual) / 100;
+  }
+
+  // Descrição
+  var descInput = document.createElement('input');
+  descInput.type = 'text'; descInput.name = 'servico_desc[]';
+  descInput.className = 'form-control form-control-sm mb-2';
+  descInput.placeholder = 'Descrição do serviço';
+  descInput.value = desc || ''; descInput.required = true;
+
+  // Linha 2: unidade + qtd + valor
+  var linha2 = document.createElement('div');
+  linha2.className = 'd-flex gap-2 flex-wrap align-items-center mb-1';
+
+  var unidInput = document.createElement('input');
+  unidInput.type = 'text'; unidInput.name = 'servico_unidade[]';
+  unidInput.className = 'form-control form-control-sm';
+  unidInput.placeholder = 'Unid.'; unidInput.value = unidade || 'M²';
+  unidInput.style.width = '70px';
+
+  var qtdInput = document.createElement('input');
+  qtdInput.type = 'number'; qtdInput.name = 'servico_qtd[]';
+  qtdInput.className = 'form-control form-control-sm';
+  qtdInput.placeholder = 'Qtd'; qtdInput.value = '1'; qtdInput.min = '0.01'; qtdInput.step = 'any';
+  qtdInput.style.width = '70px';
+
+  var valorInput = document.createElement('input');
+  valorInput.type = 'text'; valorInput.name = 'servico_valor[]';
+  valorInput.className = 'form-control form-control-sm';
+  valorInput.placeholder = 'R$ Valor unitário';
+  valorInput.value = valorFinal ? formatarPreco(valorFinal) : '';
+
+  // Campo percentual inline
+  var percWrap = document.createElement('div');
+  percWrap.className = 'input-group input-group-sm flex-nowrap';
+  percWrap.style.width = '110px';
+  var percInput = document.createElement('input');
+  percInput.type = 'number'; percInput.name = 'servico_percentual[]';
+  percInput.className = 'form-control form-control-sm';
+  percInput.placeholder = '%'; percInput.min = '0'; percInput.max = '100'; percInput.step = 'any';
+  percInput.value = percentual || '';
+  percInput.title = 'Percentual (%)';
+  var percSpan = document.createElement('span');
+  percSpan.className = 'input-group-text'; percSpan.textContent = '%';
+  percInput.addEventListener('input', function() {
+    row.dataset.percentual = this.value;
+    var obra = getValorObra();
+    var p = parseFloat(this.value) || 0;
+    if (p && obra) valorInput.value = formatarPreco(obra * p / 100);
+  });
+  percWrap.appendChild(percInput);
+  percWrap.appendChild(percSpan);
+
+  // Linha 3: prazo/forma de pagamento
+  var linha3 = document.createElement('div');
+  linha3.className = 'd-flex gap-2 align-items-center';
+
+  var prazoSelect = document.createElement('select');
+  prazoSelect.name = 'servico_prazo[]';
+  prazoSelect.className = 'form-select form-select-sm flex-grow-1';
+
+  var optCustom = document.createElement('option');
+  optCustom.value = ''; optCustom.textContent = '— Forma de pagamento —';
+  prazoSelect.appendChild(optCustom);
+  formasPagamento.forEach(function(f) {
+    var opt = document.createElement('option');
+    opt.value = f; opt.textContent = f;
+    prazoSelect.appendChild(opt);
+  });
+  // Opção "outro"
+  var optOutro = document.createElement('option');
+  optOutro.value = '__outro__'; optOutro.textContent = 'Outro (digitar)';
+  prazoSelect.appendChild(optOutro);
+
+  var prazoInput = document.createElement('input');
+  prazoInput.type = 'text'; prazoInput.name = '_prazo_livre_[]';
+  prazoInput.className = 'form-control form-control-sm flex-grow-1';
+  prazoInput.placeholder = 'Descreva a forma de pagamento...';
+  prazoInput.style.display = 'none';
+
+  prazoSelect.addEventListener('change', function() {
+    if (this.value === '__outro__') {
+      prazoInput.style.display = '';
+      prazoInput.name = 'servico_prazo[]';
+      prazoSelect.name = '_prazo_select_[]';
+    } else {
+      prazoInput.style.display = 'none';
+      prazoInput.name = '_prazo_livre_[]';
+      prazoSelect.name = 'servico_prazo[]';
+    }
+  });
+
+  var removeBtn = document.createElement('button');
+  removeBtn.type = 'button'; removeBtn.className = 'btn btn-outline-danger btn-sm flex-shrink-0';
+  removeBtn.innerHTML = '<i class="bi bi-trash"></i>';
+  removeBtn.addEventListener('click', function() { row.remove(); atualizarEmpty(); });
+
+  linha2.appendChild(unidInput);
+  linha2.appendChild(qtdInput);
+  linha2.appendChild(valorInput);
+  linha2.appendChild(percWrap);
+  linha3.appendChild(prazoSelect);
+  linha3.appendChild(prazoInput);
+  linha3.appendChild(removeBtn);
+
+  row.appendChild(descInput);
+  row.appendChild(linha2);
+  row.appendChild(linha3);
+
+  document.getElementById('servicosLista').appendChild(row);
+}
+
+// Botão catálogo
+var btnCatalogo = document.getElementById('btnAddCatalogo');
+if (btnCatalogo) {
+  btnCatalogo.addEventListener('click', function() {
+    var sel = document.getElementById('catalogo');
+    var opt = sel.options[sel.selectedIndex];
+    if (!opt || !opt.value) { alert('Selecione um serviço do catálogo.'); return; }
+    adicionarServico(
+      opt.getAttribute('data-desc'),
+      opt.getAttribute('data-unidade'),
+      opt.getAttribute('data-preco'),
+      opt.getAttribute('data-percentual')
+    );
+    sel.selectedIndex = 0;
+  });
+}
+
+document.getElementById('btnAvulso').addEventListener('click', function() {
+  adicionarServico('', 'M²', '', '');
+});
+</script>
+{% endblock %}

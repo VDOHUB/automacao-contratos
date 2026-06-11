@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Editar' if action == 'editar' else 'Novo' }} Serviço{% endblock %}
+{% block content %}
+<div class="d-flex align-items-center gap-2 mb-4">
+  <a href="{{ url_for('servicos') }}" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-left"></i>
+  </a>
+  <h2 class="h4 fw-bold mb-0">{{ 'Editar Serviço' if action == 'editar' else 'Novo Serviço' }}</h2>
+</div>
+
+<div class="card" style="max-width:600px">
+  <div class="card-body">
+    <form method="post">
+
+      <div class="mb-3">
+        <label class="form-label">Nome do Serviço *</label>
+        <input type="text" name="nome" class="form-control" required
+               value="{{ servico.nome if servico else '' }}">
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Descrição *</label>
+        <textarea name="descricao" class="form-control" rows="3" required>{{ servico.descricao if servico else '' }}</textarea>
+      </div>
+
+      <div class="row g-3 mb-3">
+        <div class="col-md-6">
+          <label class="form-label">Categoria</label>
+          <select name="categoria" class="form-select">
+            <option value="">— Sem categoria —</option>
+            {% for cat in categorias %}
+            <option value="{{ cat.nome }}"
+              {% if servico and servico.categoria == cat.nome %}selected{% endif %}>
+              {{ cat.nome }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Unidade de Medida</label>
+          <select name="unidade" class="form-select">
+            {% for u in unidades %}
+            <option value="{{ u.nome }}"
+              {% if servico and servico.unidade == u.nome %}selected
+              {% elif not servico and u.nome == 'M²' %}selected{% endif %}>
+              {{ u.nome }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div class="row g-3 mb-3">
+        <div class="col-md-6">
+          <label class="form-label">Preço Padrão (R$)</label>
+          <input type="text" name="preco_padrao" class="form-control" placeholder="0,00"
+                 value="{{ '%.2f'|format(servico.preco_padrao)|replace('.',',') if servico and servico.preco_padrao else '' }}">
+          <div class="form-text">Valor unitário fixo do serviço.</div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Percentual (%)</label>
+          <div class="input-group">
+            <input type="text" name="percentual_padrao" id="percentual_padrao" class="form-control"
+                   placeholder="0,00"
+                   value="{{ '%.2f'|format(servico.percentual_padrao)|replace('.',',') if servico and servico.percentual_padrao else '' }}">
+            <span class="input-group-text">%</span>
+          </div>
+          <div class="form-text">% do valor total da obra para calcular o valor.</div>
+        </div>
+      </div>
+
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-check-lg me-1"></i> Salvar
+        </button>
+        <a href="{{ url_for('servicos') }}" class="btn btn-outline-secondary">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% endblock %}

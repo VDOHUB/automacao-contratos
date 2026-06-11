@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Upload de Documentos{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-2 mb-4">
+  <a href="{{ url_for('escolher_tipo') }}" class="step-badge done text-decoration-none">
+    <i class="bi bi-check-lg"></i>
+  </a>
+  <span class="text-muted">Tipo</span>
+  <i class="bi bi-chevron-right text-muted"></i>
+  <div class="step-badge">2</div>
+  <span class="fw-semibold">Documentos</span>
+  <i class="bi bi-chevron-right text-muted"></i>
+  <div class="step-badge" style="background:#ccc;">3</div>
+  <span class="text-muted">Dados &amp; Serviços</span>
+</div>
+
+<h2 class="h4 fw-bold mb-1">{{ info.label }}</h2>
+<p class="text-muted mb-4">
+  Envie fotos dos documentos do <strong>Contratante</strong> e do <strong>Empreiteiro/Executora</strong>.
+  O sistema extrai os dados automaticamente via OCR.
+</p>
+
+<form method="post" enctype="multipart/form-data">
+  <div class="card mb-4">
+    <div class="card-body">
+      <p class="section-title">Documentos aceitos</p>
+      <ul class="list-unstyled mb-3">
+        <li><i class="bi bi-check-circle text-success me-2"></i>RG (frente e verso)</li>
+        <li><i class="bi bi-check-circle text-success me-2"></i>CNH</li>
+        <li><i class="bi bi-check-circle text-success me-2"></i>Comprovante de endereço</li>
+        <li><i class="bi bi-check-circle text-success me-2"></i>Cartão CPF</li>
+      </ul>
+
+      <!-- Drop zone -->
+      <div class="upload-area" id="dropZone">
+        <div class="upload-icon mb-2"><i class="bi bi-cloud-upload"></i></div>
+        <p class="mb-1 fw-semibold">Arraste os arquivos aqui</p>
+        <p class="text-muted small mb-3">ou clique para selecionar</p>
+        <input type="file" name="documentos" id="fileInput" multiple accept="image/*"
+               class="d-none">
+        <button type="button" class="btn btn-outline-primary btn-sm" onclick="document.getElementById('fileInput').click()">
+          <i class="bi bi-folder2-open me-1"></i> Selecionar arquivos
+        </button>
+      </div>
+
+      <!-- Preview de arquivos selecionados -->
+      <div id="fileList" class="mt-3 d-none">
+        <p class="fw-semibold mb-2">Arquivos selecionados:</p>
+        <ul id="fileNames" class="list-group list-group-flush"></ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+    <a href="{{ url_for('escolher_tipo') }}" class="btn btn-outline-secondary">
+      <i class="bi bi-arrow-left me-1"></i> Voltar
+    </a>
+    <button type="submit" class="btn btn-primary" id="btnSubmit" disabled>
+      <i class="bi bi-magic me-1"></i> Extrair dados com OCR
+    </button>
+  </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const fileInput = document.getElementById('fileInput');
+const dropZone = document.getElementById('dropZone');
+const fileList = document.getElementById('fileList');
+const fileNames = document.getElementById('fileNames');
+const btnSubmit = document.getElementById('btnSubmit');
+
+function updateFileList(files) {
+  fileNames.innerHTML = '';
+  if (files.length === 0) { fileList.classList.add('d-none'); btnSubmit.disabled = true; return; }
+  fileList.classList.remove('d-none');
+  btnSubmit.disabled = false;
+  Array.from(files).forEach(f => {
+    const li = document.createElement('li');
+    li.className = 'list-group-item d-flex align-items-center gap-2 px-0';
+    li.innerHTML = `<i class="bi bi-file-image text-success"></i> ${f.name} <small class="text-muted">(${(f.size/1024).toFixed(0)} KB)</small>`;
+    fileNames.appendChild(li);
+  });
+}
+
+fileInput.addEventListener('change', () => updateFileList(fileInput.files));
+
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  const dt = new DataTransfer();
+  Array.from(e.dataTransfer.files).forEach(f => dt.items.add(f));
+  fileInput.files = dt.files;
+  updateFileList(fileInput.files);
+});
+
+// Loading state on submit
+document.querySelector('form').addEventListener('submit', () => {
+  btnSubmit.disabled = true;
+  btnSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Processando OCR...';
+});
+</script>
+{% endblock %}

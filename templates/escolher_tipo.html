@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Novo Contrato — Escolher Tipo{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-2 mb-4">
+  <div class="step-badge">1</div>
+  <span class="fw-semibold">Tipo de Contrato</span>
+  <i class="bi bi-chevron-right text-muted"></i>
+  <div class="step-badge" style="background:#ccc;">2</div>
+  <span class="text-muted small">Partes</span>
+  <i class="bi bi-chevron-right text-muted"></i>
+  <div class="step-badge" style="background:#ccc;">3</div>
+  <span class="text-muted small">Serviços &amp; Datas</span>
+</div>
+
+<h2 class="h4 fw-bold mb-1">Qual tipo de contrato?</h2>
+<p class="text-muted mb-4">Selecione o modelo que será preenchido.</p>
+
+<div class="row g-3">
+  {% for tipo in tipos %}
+  <div class="col-6 col-md-4">
+    <a href="{{ url_for('selecionar_partes', tipo=tipo.id) }}" class="text-decoration-none">
+      <div class="card tipo-card h-100 p-3 text-center">
+        <div class="icon mb-2">
+          {% if 'empreiteiro' in tipo.id %}<i class="bi bi-tools"></i>
+          {% elif 'alvenaria' in tipo.id %}<i class="bi bi-bricks"></i>
+          {% elif 'carpinteiro' in tipo.id %}<i class="bi bi-hammer"></i>
+          {% elif 'armador' in tipo.id %}<i class="bi bi-wrench-adjustable"></i>
+          {% elif 'piscina' in tipo.id %}<i class="bi bi-water"></i>
+          {% elif 'arrimo' in tipo.id %}<i class="bi bi-layers"></i>
+          {% else %}<i class="bi bi-file-earmark-text"></i>
+          {% endif %}
+        </div>
+        <div class="fw-semibold">{{ tipo.label }}</div>
+      </div>
+    </a>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

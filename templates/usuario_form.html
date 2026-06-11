@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Editar' if action == 'editar' else 'Novo' }} Usuário{% endblock %}
+{% block content %}
+<div class="d-flex align-items-center gap-2 mb-4">
+  <a href="{{ url_for('usuarios') }}" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-left"></i>
+  </a>
+  <h2 class="h4 fw-bold mb-0">{{ 'Editar Usuário' if action == 'editar' else 'Novo Usuário' }}</h2>
+</div>
+
+<div class="card" style="max-width:480px">
+  <div class="card-body">
+    <form method="post">
+      <div class="mb-3">
+        <label class="form-label">Login</label>
+        <input type="text" name="login" class="form-control" required
+               value="{{ usuario.login if usuario else '' }}">
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Perfil</label>
+        <select name="role" class="form-select">
+          <option value="visualizador" {% if not usuario or usuario.role == 'visualizador' %}selected{% endif %}>
+            Visualizador — pode ver e gerar contratos
+          </option>
+          <option value="admin" {% if usuario and usuario.role == 'admin' %}selected{% endif %}>
+            Admin — acesso total incluindo cadastros e usuários
+          </option>
+        </select>
+      </div>
+      <div class="mb-4">
+        <label class="form-label">
+          Senha {% if action == 'editar' %}<span class="text-muted fw-normal">(deixe em branco para não alterar)</span>{% endif %}
+        </label>
+        <input type="password" name="senha" class="form-control"
+               {% if action == 'novo' %}required{% endif %}
+               placeholder="••••••••">
+      </div>
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-check-lg me-1"></i> Salvar
+        </button>
+        <a href="{{ url_for('usuarios') }}" class="btn btn-outline-secondary">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

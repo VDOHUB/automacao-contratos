@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Usuários — Viver de Obra{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="h4 fw-bold mb-0"><i class="bi bi-people-fill me-2"></i>Usuários</h2>
+  <a href="{{ url_for('novo_usuario') }}" class="btn btn-primary">
+    <i class="bi bi-plus-lg me-1"></i> Novo Usuário
+  </a>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Login</th>
+          <th>Perfil</th>
+          <th>Status</th>
+          <th>Criado em</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in usuarios %}
+        <tr>
+          <td class="fw-semibold">{{ u.login }}</td>
+          <td>
+            <span class="badge {% if u.role == 'admin' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
+              {{ u.role }}
+            </span>
+          </td>
+          <td>
+            {% if u.ativo %}
+              <span class="badge bg-success">Ativo</span>
+            {% else %}
+              <span class="badge bg-danger">Inativo</span>
+            {% endif %}
+          </td>
+          <td class="text-muted small">{{ u.criado_em[:10] if u.criado_em else '—' }}</td>
+          <td class="text-end">
+            <a href="{{ url_for('editar_usuario', uid=u.id) }}" class="btn btn-sm btn-outline-secondary me-1">
+              <i class="bi bi-pencil"></i>
+            </a>
+            {% if u.id != session.get('user_id') %}
+            <form method="post" action="{{ url_for('excluir_usuario', uid=u.id) }}" class="d-inline"
+                  onsubmit="return confirm('Remover usuário {{ u.login }}?')">
+              <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="text-center text-muted py-4">Nenhum usuário cadastrado.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

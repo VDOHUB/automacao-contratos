@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — {{ cliente.nome }}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-2 mb-4">
+  <a href="{{ url_for('clientes') }}" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-left"></i>
+  </a>
+  <div>
+    <h2 class="h4 fw-bold mb-0">{{ cliente.nome }}</h2>
+    <p class="text-muted small mb-0">CPF: {{ cliente.cpf or '—' }}
+      {% if cliente.logradouro %} · {{ cliente.logradouro }}{% endif %}
+    </p>
+  </div>
+  <div class="ms-auto d-flex gap-2">
+    <a href="{{ url_for('historico_cliente', cid=cliente.id) }}" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-file-text me-1"></i>Contratos
+    </a>
+    <a href="{{ url_for('escolher_tipo') }}" class="btn btn-sm btn-primary">
+      <i class="bi bi-plus-circle me-1"></i>Novo Contrato
+    </a>
+  </div>
+</div>
+
+<!-- ── KPIs ── -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card text-center h-100">
+      <div class="card-body py-3">
+        <div class="fs-2 fw-bold" style="color:var(--principal)">{{ metricas.total_contratos }}</div>
+        <div class="text-muted small">Contratos</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center h-100">
+      <div class="card-body py-3">
+        <div class="fs-4 fw-bold" style="color:var(--dourado,#C3A17C)">
+          R$ {{ '{:,.2f}'.format(metricas.total_gasto).replace(',','X').replace('.',',').replace('X','.') }}
+        </div>
+        <div class="text-muted small">Total Contratado</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center h-100">
+      <div class="card-body py-3">
+        <div class="fs-2 fw-bold" style="color:var(--escuro)">{{ metricas.executoras|length }}</div>
+        <div class="text-muted small">Executoras</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center h-100">
+      <div class="card-body py-3">
+        <div class="fs-2 fw-bold" style="color:var(--cinza,#DAD6D7)">{{ metricas.por_tipo|length }}</div>
+        <div class="text-muted small">Tipos de Serviço</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+
+  <!-- Gastos por mês -->
+  <div class="col-md-8">
+    <div class="card h-100">
+      <div class="card-body">
+        <p class="section-title"><i class="bi bi-bar-chart me-2"></i>Gastos por Mês</p>
+        <canvas id="chartMes" height="90"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Contratos por tipo -->
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-body">
+        <p class="section-title"><i class="bi bi-pie-chart me-2"></i>Por Tipo</p>
+        <canvas id="chartTipo" height="160"></canvas>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Executoras -->
+{% if metricas.executoras %}
+<div class="card mb-4">
+  <div class="card-body">
+    <p class="section-title"><i class="bi bi-person-gear me-2"></i>Executoras Contratadas</p>
+    <div class="d-flex flex-wrap gap-2">
+      {% for e in metricas.executoras %}
+      <span class="badge rounded-pill px-3 py-2 fs-6 fw-normal"
+            style="background:#f0e8e0;color:var(--escuro)">
+        <i class="bi bi-person-check me-1"></i>{{ e }}
+      </span>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Últimos contratos -->
+<div class="card">
+  <div class="card-body">
+    <p class="section-title"><i class="bi bi-file-earmark-text me-2"></i>Últimos Contratos</p>
+    {% if contratos %}
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead>
+          <tr><th>Tipo</th><th>Executora</th><th>Valor</th><th>Data</th><th></th></tr>
+        </thead>
+        <tbody>
+          {% for c in contratos[:10] %}
+          <tr>
+            <td><span class="badge-tipo badge rounded-pill">{{ c.tipo }}</span></td>
+            <td>{{ c.nome_executora or '—' }}</td>
+            <td>
+              {% if c.valor_total %}
+                R$ {{ '{:,.2f}'.format(c.valor_total).replace(',','X').replace('.',',').replace('X','.') }}
+              {% else %}—{% endif %}
+            </td>
+            <td class="text-muted small">{{ c.criado_em[:10] if c.criado_em else '—' }}</td>
+            <td>
+              <div class="d-flex gap-1">
+                <a href="{{ url_for('recibo_contrato', cid=c.id) }}" class="btn btn-sm btn-outline-secondary" title="Recibo">
+                  <i class="bi bi-receipt"></i>
+                </a>
+                <a href="{{ url_for('download_contrato', cid=c.id) }}" class="btn btn-sm btn-outline-secondary" title="Download">
+                  <i class="bi bi-download"></i>
+                </a>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="text-muted text-center py-3">Nenhum contrato ainda.</p>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+var labelsMes  = {{ metricas.por_mes | map(attribute='mes')   | list | tojson }};
+var totalsMes  = {{ metricas.por_mes | map(attribute='total') | list | tojson }};
+var labelsTipo = {{ metricas.por_tipo | map(attribute='tipo') | list | tojson }};
+var qtdsTipo   = {{ metricas.por_tipo | map(attribute='qtd')  | list | tojson }};
+
+new Chart(document.getElementById('chartMes').getContext('2d'), {
+  type: 'bar',
+  data: {
+    labels: labelsMes,
+    datasets: [{
+      label: 'Total (R$)',
+      data: totalsMes,
+      backgroundColor: '#BEA890',
+      borderRadius: 6,
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { display: false } },
+    scales: {
+      y: { ticks: { callback: function(v){ return 'R$ '+v.toLocaleString('pt-BR'); } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('chartTipo').getContext('2d'), {
+  type: 'doughnut',
+  data: {
+    labels: labelsTipo,
+    datasets: [{
+      data: qtdsTipo,
+      backgroundColor: ['#BEA890','#C3A17C','#DAD6D7','#232728','#F9F4F8','#a89278'],
+      borderWidth: 2,
+      borderColor: '#fff',
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { position: 'bottom', labels: { boxWidth: 12 } } }
+  }
+});
+</script>
+{% endblock %}
