@@ -41,10 +41,6 @@
           <div class="mb-3">
             <label class="form-label">Arquivo .docx template *</label>
             <input type="file" name="modelo" accept=".docx" class="form-control" required>
-            <div class="form-text">
-              O arquivo deve conter as variáveis <code>{{ "{{" }} nome_contratante {{ "}}" }}</code>,
-              <code>{{ "{{" }} nome_executora {{ "}}" }}</code> etc. já inseridas.
-            </div>
           </div>
           <button type="submit" class="btn btn-primary">
             <i class="bi bi-upload me-1"></i> Enviar Template
@@ -53,40 +49,6 @@
       </div>
     </div>
 
-    <div class="card mt-3">
-      <div class="card-header fw-semibold">Variáveis disponíveis</div>
-      <div class="card-body">
-        <p class="text-muted small mb-2">Use estas variáveis no seu .docx template:</p>
-        <table class="table table-sm table-bordered small">
-          <thead class="table-light"><tr><th>Variável</th><th>Conteúdo</th></tr></thead>
-          <tbody>
-            <tr><td><code>{{ "{{" }} nome_contratante {{ "}}" }}</code></td><td>Nome do cliente</td></tr>
-            <tr><td><code>{{ "{{" }} cpf_contratante {{ "}}" }}</code></td><td>CPF do cliente</td></tr>
-            <tr><td><code>{{ "{{" }} rg_contratante {{ "}}" }}</code></td><td>RG do cliente</td></tr>
-            <tr><td><code>{{ "{{" }} logradouro_contratante {{ "}}" }}</code></td><td>Endereço do cliente</td></tr>
-            <tr><td><code>{{ "{{" }} nome_executora {{ "}}" }}</code></td><td>Nome da executora</td></tr>
-            <tr><td><code>{{ "{{" }} cnpj_executora {{ "}}" }}</code></td><td>CNPJ da executora</td></tr>
-            <tr><td><code>{{ "{{" }} cpf_executora {{ "}}" }}</code></td><td>CPF (PF)</td></tr>
-            <tr><td><code>{{ "{{" }} endereco_executora {{ "}}" }}</code></td><td>Endereço executora</td></tr>
-            <tr><td><code>{{ "{{" }} data_inicio {{ "}}" }}</code></td><td>Data de início</td></tr>
-            <tr><td><code>{{ "{{" }} prazo_execucao {{ "}}" }}</code></td><td>Prazo de execução</td></tr>
-            <tr><td><code>{{ "{{" }} data_conclusao {{ "}}" }}</code></td><td>Data conclusão</td></tr>
-            <tr><td><code>{{ "{{" }} valor_multa_fmt {{ "}}" }}</code></td><td>Multa (R$ formatado)</td></tr>
-            <tr><td><code>{{ "{{" }} valor_multa_extenso {{ "}}" }}</code></td><td>Multa por extenso</td></tr>
-            <tr><td><code>{{ "{{" }} cidade_assinatura {{ "}}" }}</code></td><td>Cidade da assinatura</td></tr>
-            <tr><td><code>{{ "{{" }} data_assinatura {{ "}}" }}</code></td><td>Data da assinatura</td></tr>
-            <tr><td colspan="2" class="table-light fw-semibold">Tabela de serviços (linha repetida)</td></tr>
-            <tr><td><code>{% raw %}{%tr for s in servicos %}{% endraw %}</code></td><td>Início do loop (1ª linha da tabela)</td></tr>
-            <tr><td><code>{{ "{{" }} s.num {{ "}}" }}</code></td><td>Número do item</td></tr>
-            <tr><td><code>{{ "{{" }} s.descricao {{ "}}" }}</code></td><td>Descrição do serviço</td></tr>
-            <tr><td><code>{{ "{{" }} s.unidade {{ "}}" }}</code></td><td>Unidade de medida</td></tr>
-            <tr><td><code>{{ "{{" }} s.valor {{ "}}" }}</code></td><td>Valor unitário</td></tr>
-            <tr><td><code>{{ "{{" }} s.prazo {{ "}}" }}</code></td><td>Prazo do serviço</td></tr>
-            <tr><td><code>{% raw %}{%tr endfor %}{% endraw %}</code></td><td>Fim do loop (última linha da tabela)</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
   </div>
 
   <!-- Tipos cadastrados no DB -->
