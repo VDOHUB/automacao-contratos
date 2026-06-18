@@ -152,6 +152,47 @@ def init_db():
             END IF;
         END $$;
     """)
+    cur.execute("""
+        DO $$ BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name='contratos' AND column_name='cnpj_executora'
+            ) THEN
+                ALTER TABLE contratos ADD COLUMN cnpj_executora TEXT;
+            END IF;
+        END $$;
+    """)
+    cur.execute("""
+        DO $$ BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name='contratos' AND column_name='endereco_executora'
+            ) THEN
+                ALTER TABLE contratos ADD COLUMN endereco_executora TEXT;
+            END IF;
+        END $$;
+    """)
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS rascunhos (
+            id SERIAL PRIMARY KEY,
+            tipo TEXT NOT NULL,
+            dados_json TEXT NOT NULL,
+            nome_contratante TEXT,
+            criado_em TIMESTAMP DEFAULT NOW(),
+            atualizado_em TIMESTAMP DEFAULT NOW()
+        )
+    """)
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS tipos_contrato (
+            id SERIAL PRIMARY KEY,
+            key TEXT NOT NULL UNIQUE,
+            label TEXT NOT NULL,
+            modelo_bytes BYTEA,
+            ativo INTEGER NOT NULL DEFAULT 1
+        )
+    """)
 
     # Dados padrão
     cur.execute("SELECT COUNT(*) FROM usuarios")
@@ -574,22 +615,130 @@ def excluir_executora(eid):
 # ---------------------------------------------------------------------------
 
 def salvar_contrato(tipo, cliente_id, executora_id, nome_contratante, cpf_contratante,
-                    nome_executora, cpf_executora, caminho, valor_total=None):
+                    nome_executora, cpf_executora, caminho, valor_total=None,
+                    cnpj_executora=None, endereco_executora=None):
     conn = get_db()
     cur = conn.cursor()
     cur.execute(
         """INSERT INTO contratos
            (tipo, cliente_id, executora_id, nome_contratante, cpf_contratante,
-            nome_executora, cpf_executora, caminho_arquivo, valor_total)
-           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
+            nome_executora, cpf_executora, caminho_arquivo, valor_total,
+            cnpj_executora, endereco_executora)
+           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
         (tipo, cliente_id, executora_id, nome_contratante, cpf_contratante,
-         nome_executora, cpf_executora, caminho, valor_total),
+         nome_executora, cpf_executora, caminho, valor_total,
+         cnpj_executora, endereco_executora),
     )
     cid = cur.fetchone()[0]
     conn.commit()
     cur.close()
     conn.close()
     return cid
+
+
+# ---------------------------------------------------------------------------
+# Rascunhos de contratos
+# ---------------------------------------------------------------------------
+
+def salvar_rascunho(tipo: str, dados_json: str, nome_contratante: str, rid: int = None) -> int:
+    conn = get_db()
+    cur = conn.cursor()
+    if rid:
+        cur.execute(
+            """UPDATE rascunhos SET tipo=%s, dados_json=%s, nome_contratante=%s,
+               atualizado_em=NOW() WHERE id=%s""",
+            (tipo, dados_json, nome_contratante, rid),
+        )
+    else:
+        cur.execute(
+            """INSERT INTO rascunhos (tipo, dados_json, nome_contratante)
+               VALUES (%s,%s,%s) RETURNING id""",
+            (tipo, dados_json, nome_contratante),
+        )
+        rid = cur.fetchone()[0]
+    conn.commit()
+    cur.close()
+    conn.close()
+    return rid
+
+
+def listar_rascunhos():
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT id, tipo, nome_contratante, criado_em, atualizado_em FROM rascunhos ORDER BY atualizado_em DESC")
+    rows = _rows_to_dicts(cur)
+    cur.close()
+    conn.close()
+    return rows
+
+
+def buscar_rascunho(rid: int):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM rascunhos WHERE id=%s", (rid,))
+    rows = _rows_to_dicts(cur)
+    cur.close()
+    conn.close()
+    return rows[0] if rows else None
+
+
+def excluir_rascunho(rid: int):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM rascunhos WHERE id=%s", (rid,))
+    conn.commit()
+    cur.close()
+    conn.close()
+
+
+# ---------------------------------------------------------------------------
+# Tipos de contrato (personalizados pelo admin)
+# ---------------------------------------------------------------------------
+
+def listar_tipos_contrato_db():
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT id, key, label, ativo FROM tipos_contrato WHERE ativo=1 ORDER BY label")
+    rows = _rows_to_dicts(cur)
+    cur.close()
+    conn.close()
+    return rows
+
+
+def buscar_tipo_contrato(key: str):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM tipos_contrato WHERE key=%s AND ativo=1", (key,))
+    rows = _rows_to_dicts(cur)
+    cur.close()
+    conn.close()
+    return rows[0] if rows else None
+
+
+def salvar_tipo_contrato(key: str, label: str, modelo_bytes: bytes) -> int:
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(
+        """INSERT INTO tipos_contrato (key, label, modelo_bytes)
+           VALUES (%s,%s,%s)
+           ON CONFLICT (key) DO UPDATE SET label=%s, modelo_bytes=%s, ativo=1
+           RETURNING id""",
+        (key, label, modelo_bytes, label, modelo_bytes),
+    )
+    tid = cur.fetchone()[0]
+    conn.commit()
+    cur.close()
+    conn.close()
+    return tid
+
+
+def excluir_tipo_contrato(tid: int):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("UPDATE tipos_contrato SET ativo=0 WHERE id=%s", (tid,))
+    conn.commit()
+    cur.close()
+    conn.close()
 
 
 def buscar_contrato(cid: int):

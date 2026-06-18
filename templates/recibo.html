@@ -244,11 +244,11 @@
           </div>
           <div class="rec-row">
             <span class="lbl">Endereço</span>
-            <input type="text" id="rec_end_emit" value="{{ contrato.executora_endereco or '' }}">
+            <input type="text" id="rec_end_emit" value="{{ contrato.executora_endereco or contrato.endereco_executora or '' }}">
           </div>
           <div class="rec-row">
             <span class="lbl">CNPJ / CPF / RG</span>
-            <input type="text" id="rec_doc_emit" value="{{ contrato.executora_cnpj or contrato.executora_cpf_doc or contrato.cpf_executora or '' }}">
+            <input type="text" id="rec_doc_emit" value="{{ contrato.executora_cnpj or contrato.cnpj_executora or contrato.executora_cpf_doc or contrato.cpf_executora or '' }}">
           </div>
           <div class="rec-assin" style="margin-top:28px;border-top:1px solid #1a5fa8">
             (Assinatura)

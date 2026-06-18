@@ -16,30 +16,35 @@ load_dotenv()
 
 client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 
-PROMPT = """Analise a imagem deste documento brasileiro e extraia os dados em JSON.
+PROMPT = """Analise esta imagem de documento brasileiro e extraia os dados em JSON.
 Retorne APENAS o JSON, sem texto adicional, sem markdown, sem ```json.
 
-Para RG ou Identidade:
+REGRAS CRÍTICAS:
+- "nome" = nome do TITULAR do documento (NUNCA o nome da mãe, pai ou cônjuge)
+- CPF do titular pode aparecer como "CPF:", "Nº CPF:" ou número no formato XXX.XXX.XXX-XX
+- Para RG, o CPF pode estar na frente OU no verso — extraia se visível
+- Para CNPJ, "razao_social" = nome oficial da empresa (ex: "LCJ Construtora LTDA")
+- "nome" para CNPJ = mesmo valor que razao_social
+- Se um campo não for visível, deixe como string vazia ""
+- Formate CPF como XXX.XXX.XXX-XX
+- Formate CNPJ como XX.XXX.XXX/XXXX-XX
+- Mantenha o número do RG no formato original do documento
+- Nomes em MAIÚSCULAS conforme aparecem no documento
+
+Para RG ou Identidade (frente ou verso):
 {"tipo": "rg", "nome": "", "cpf": "", "rg": "", "data_nascimento": "", "naturalidade": "", "filiacao_mae": "", "filiacao_pai": ""}
 
-Para CNH:
+Para CNH (Carteira Nacional de Habilitação):
 {"tipo": "cnh", "nome": "", "cpf": "", "rg": "", "data_nascimento": "", "naturalidade": ""}
 
-Para comprovante de endereço:
+Para comprovante de endereço (conta, boleto, correspondência):
 {"tipo": "endereco", "logradouro": "", "numero": "", "complemento": "", "bairro": "", "cidade": "", "uf": "", "cep": ""}
 
 Para cartão CPF:
 {"tipo": "cpf", "nome": "", "cpf": ""}
 
-Para cartão CNPJ ou contrato social:
+Para cartão CNPJ, contrato social ou documento de empresa:
 {"tipo": "cnpj", "razao_social": "", "cnpj": "", "endereco": "", "nome": ""}
-
-Regras:
-- Se não conseguir identificar algum campo, deixe como string vazia ""
-- Formate CPF como XXX.XXX.XXX-XX
-- Formate CNPJ como XX.XXX.XXX/XXXX-XX
-- Mantenha o RG no formato original do documento
-- O nome deve estar em letras maiúsculas como aparece no documento
 """
 
 

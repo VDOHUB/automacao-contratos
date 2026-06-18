@@ -518,4 +518,33 @@ def gerar_contrato(tipo: str, dados: dict, servicos: list[dict]) -> Path:
 
 
 def listar_tipos_contrato() -> list[dict]:
-    return [{"id": k, "label": v["label"]} for k, v in CONTRATOS.items()]
+    import database as _db
+    resultado = [{"id": k, "label": v["label"], "origem": "sistema"} for k, v in CONTRATOS.items()]
+    try:
+        extras = _db.listar_tipos_contrato_db()
+        for t in extras:
+            if t["key"] not in CONTRATOS:
+                resultado.append({"id": t["key"], "label": t["label"], "origem": "personalizado"})
+    except Exception:
+        pass
+    return resultado
+
+
+def gerar_contrato_dinamico(key: str, modelo_bytes: bytes, dados: dict, servicos: list[dict]) -> Path:
+    """Gera contrato a partir de template .docx armazenado no banco (já com variáveis Jinja2)."""
+    import tempfile
+    with tempfile.NamedTemporaryFile(suffix=".docx", delete=False) as tmp:
+        tmp.write(modelo_bytes)
+        tmp_path = tmp.name
+
+    tpl = DocxTemplate(tmp_path)
+    for i, s in enumerate(servicos, 1):
+        s["num"] = i
+    context = {**dados, "servicos": servicos}
+    tpl.render(context)
+
+    nome_safe = re.sub(r"[^\w]", "_", dados.get("nome_contratante", "contrato"))
+    filename = f"{key}_{nome_safe}.docx"
+    out_path = GENERATED_DIR / filename
+    tpl.save(str(out_path))
+    return out_path

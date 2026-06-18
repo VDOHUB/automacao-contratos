@@ -241,8 +241,10 @@ def index():
         contratos = db.listar_contratos(cliente_id=cliente_id)
     else:
         contratos = db.listar_contratos()
+    rascunhos = db.listar_rascunhos()
     return render_template("index.html",
                            contratos=contratos,
+                           rascunhos=rascunhos,
                            clientes=clientes,
                            executoras=executoras,
                            servicos=servicos,
@@ -528,7 +530,8 @@ def escolher_tipo():
 @app.route("/contrato/novo/<tipo>/partes", methods=["GET", "POST"])
 @login_required
 def selecionar_partes(tipo):
-    if tipo not in cg.CONTRATOS:
+    todos_tipos_ids = {t["id"] for t in cg.listar_tipos_contrato()}
+    if tipo not in todos_tipos_ids:
         flash("Tipo inválido.", "danger")
         return redirect(url_for("escolher_tipo"))
 
@@ -617,10 +620,11 @@ def selecionar_partes(tipo):
     saved_cli_id = session.pop("saved_cli_id", "")
     saved_exec_id = session.pop("saved_exec_id", "")
 
+    info_tp = cg.CONTRATOS.get(tipo) or {"label": tipo, "modelo": "", "template": ""}
     return render_template(
         "selecionar_partes.html",
         tipo=tipo,
-        info=cg.CONTRATOS[tipo],
+        info=info_tp,
         clientes=clientes_lista,
         executoras=executoras_lista,
         ocr_cliente=ocr_cliente,
@@ -639,12 +643,22 @@ def selecionar_partes(tipo):
 @app.route("/contrato/novo/<tipo>/formulario", methods=["GET", "POST"])
 @login_required
 def formulario_contrato(tipo):
-    if tipo not in cg.CONTRATOS:
+    todos_tipos = {t["id"]: t for t in cg.listar_tipos_contrato()}
+    if tipo not in todos_tipos:
         flash("Tipo inválido.", "danger")
         return redirect(url_for("escolher_tipo"))
+    info_tipo = cg.CONTRATOS.get(tipo) or todos_tipos[tipo]
 
     servicos_catalogo = db.listar_servicos()
     formas_pagamento = db.listar_formas_pagamento()
+
+    rascunho_id = request.args.get("rascunho_id", type=int)
+    dados_rascunho = {}
+    if rascunho_id:
+        r = db.buscar_rascunho(rascunho_id)
+        if r:
+            import json as _json
+            dados_rascunho = _json.loads(r["dados_json"])
 
     cliente_id = session.get("contrato_cliente_id")
     executora_id = session.get("contrato_executora_id")
@@ -677,7 +691,7 @@ def formulario_contrato(tipo):
                 "endereco_executora": e["endereco"] or "",
             }
 
-    dados_iniciais = {**form_cliente, **form_executora}
+    dados_iniciais = {**form_cliente, **form_executora, **dados_rascunho}
 
     if request.method == "POST":
         dados = {
@@ -730,21 +744,47 @@ def formulario_contrato(tipo):
                     "prazo": servicos_prazo[i] if i < len(servicos_prazo) else "",
                 })
 
+        action = request.form.get("action", "gerar")
+
+        if action == "rascunho":
+            import json as _json
+            rid = request.form.get("rascunho_id", type=int)
+            tudo = {**dados,
+                    "servicos_desc": servicos_desc,
+                    "servicos_unid": servicos_unid,
+                    "servicos_qtd": servicos_qtd,
+                    "servicos_val": servicos_val,
+                    "servicos_prazo": servicos_prazo}
+            rid = db.salvar_rascunho(tipo, _json.dumps(tudo, ensure_ascii=False),
+                                     dados.get("nome_contratante", ""), rid)
+            flash("Rascunho salvo com sucesso!", "success")
+            return redirect(url_for("index"))
+
         if not dados["nome_contratante"]:
             flash("Nome do contratante é obrigatório.", "danger")
             return render_template("formulario_contrato.html", tipo=tipo,
-                                   info=cg.CONTRATOS[tipo], dados=dados_iniciais,
+                                   info=info_tipo, dados=dados_iniciais,
+                                   rascunho_id=rascunho_id,
                                    servicos_catalogo=servicos_catalogo,
                                    formas_pagamento=formas_pagamento)
 
         try:
-            caminho = cg.gerar_contrato(tipo, dados, servicos_list)
+            tipo_db = db.buscar_tipo_contrato(tipo)
+            if tipo_db and tipo_db.get("modelo_bytes"):
+                caminho = cg.gerar_contrato_dinamico(tipo, bytes(tipo_db["modelo_bytes"]), dados, servicos_list)
+            else:
+                caminho = cg.gerar_contrato(tipo, dados, servicos_list)
+
             cid = db.salvar_contrato(
                 tipo, cliente_id, executora_id,
                 dados["nome_contratante"], dados["cpf_contratante"],
                 dados["nome_executora"], dados.get("cpf_executora", ""),
                 str(caminho), valor_total if valor_total > 0 else None,
+                cnpj_executora=dados.get("cnpj_executora", "") or None,
+                endereco_executora=dados.get("endereco_executora", "") or None,
             )
+            if rascunho_id:
+                db.excluir_rascunho(rascunho_id)
             for k in ["contrato_tipo", "contrato_cliente_id", "contrato_executora_id",
                       "form_cliente", "form_executora"]:
                 session.pop(k, None)
@@ -754,7 +794,8 @@ def formulario_contrato(tipo):
             flash(f"Erro ao gerar contrato: {e}", "danger")
 
     return render_template("formulario_contrato.html", tipo=tipo,
-                           info=cg.CONTRATOS[tipo], dados=dados_iniciais,
+                           info=info_tipo, dados=dados_iniciais,
+                           rascunho_id=rascunho_id,
                            servicos_catalogo=servicos_catalogo,
                            formas_pagamento=formas_pagamento)
 
@@ -771,6 +812,63 @@ def recibo_contrato(cid):
         flash("Contrato não encontrado.", "danger")
         return redirect(url_for("index"))
     return render_template("recibo.html", contrato=contrato)
+
+
+@app.route("/recibo/avulso")
+@login_required
+def recibo_avulso():
+    return render_template("recibo_avulso.html")
+
+
+# ---------------------------------------------------------------------------
+# Rascunhos
+# ---------------------------------------------------------------------------
+
+@app.route("/rascunho/<int:rid>/excluir", methods=["POST"])
+@login_required
+def excluir_rascunho(rid):
+    db.excluir_rascunho(rid)
+    flash("Rascunho excluído.", "info")
+    return redirect(url_for("index"))
+
+
+# ---------------------------------------------------------------------------
+# Tipos de contrato (admin)
+# ---------------------------------------------------------------------------
+
+@app.route("/admin/tipos-contrato")
+@admin_required
+def admin_tipos_contrato():
+    tipos_db = db.listar_tipos_contrato_db()
+    return render_template("admin_tipos_contrato.html",
+                           tipos_db=tipos_db,
+                           tipos_sistema=list(cg.CONTRATOS.keys()))
+
+
+@app.route("/admin/tipos-contrato/novo", methods=["POST"])
+@admin_required
+def admin_novo_tipo_contrato():
+    key = request.form.get("key", "").strip().lower().replace(" ", "_")
+    label = request.form.get("label", "").strip()
+    arquivo = request.files.get("modelo")
+    if not key or not label or not arquivo or not arquivo.filename:
+        flash("Preencha todos os campos e envie o arquivo .docx.", "danger")
+        return redirect(url_for("admin_tipos_contrato"))
+    if not arquivo.filename.lower().endswith(".docx"):
+        flash("O arquivo deve ser .docx.", "danger")
+        return redirect(url_for("admin_tipos_contrato"))
+    modelo_bytes = arquivo.read()
+    db.salvar_tipo_contrato(key, label, modelo_bytes)
+    flash(f"Tipo '{label}' salvo com sucesso!", "success")
+    return redirect(url_for("admin_tipos_contrato"))
+
+
+@app.route("/admin/tipos-contrato/<int:tid>/excluir", methods=["POST"])
+@admin_required
+def admin_excluir_tipo_contrato(tid):
+    db.excluir_tipo_contrato(tid)
+    flash("Tipo de contrato removido.", "info")
+    return redirect(url_for("admin_tipos_contrato"))
 
 
 # ---------------------------------------------------------------------------

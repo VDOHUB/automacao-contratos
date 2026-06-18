@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Recibo Avulso — Viver de Obra</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    body { background: #e8e8e8; font-family: Arial, sans-serif; }
+    .recibo-wrap { max-width: 780px; margin: 30px auto; }
+    .btn-bar { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+
+    .recibo { background: #fff; border: 2px solid #1a5fa8; border-radius: 6px; padding: 0; overflow: hidden; }
+
+    .rec-header { display: flex; align-items: stretch; border-bottom: 2px solid #1a5fa8; }
+    .rec-title { background: #1a5fa8; color: #fff; font-size: 2rem; font-weight: 900; padding: 10px 22px;
+                 letter-spacing: 1px; display: flex; align-items: center; min-width: 140px; }
+    .rec-num { flex: 1; padding: 10px 16px; font-size: .85rem; color: #1a5fa8; font-weight: 600;
+               display: flex; align-items: center; }
+    .rec-num input { border: none; border-bottom: 1px solid #1a5fa8; font-size: .95rem; width: 100px;
+                     outline: none; color: #333; }
+    .rec-valor-box { width: 160px; border-left: 2px solid #1a5fa8; display: flex; flex-direction: column;
+                     align-items: center; justify-content: center; padding: 8px 12px; background: #eaf1fb; }
+    .rec-valor-box .lbl { font-size: .7rem; color: #1a5fa8; font-weight: 700; text-transform: uppercase; }
+    .rec-valor-box input { border: none; outline: none; background: transparent; font-size: 1.1rem;
+                           font-weight: 700; color: #1a5fa8; text-align: center; width: 100%; }
+
+    .rec-body { padding: 0 18px 12px; }
+    .rec-row { display: flex; align-items: flex-end; border-bottom: 1px solid #1a5fa8;
+               padding: 10px 0 4px; gap: 8px; }
+    .rec-row .lbl { font-size: .72rem; color: #1a5fa8; font-weight: 700; white-space: nowrap;
+                    text-transform: uppercase; }
+    .rec-row input, .rec-row textarea { border: none; outline: none; width: 100%;
+                                        font-size: .93rem; color: #333; background: transparent;
+                                        resize: none; padding: 0; }
+
+    .rec-corr { padding: 10px 0 4px; border-bottom: 1px solid #1a5fa8; }
+    .rec-corr .lbl { font-size: .72rem; color: #1a5fa8; font-weight: 700; text-transform: uppercase; }
+    .rec-corr textarea { border: none; outline: none; width: 100%; resize: none;
+                         font-size: .93rem; color: #333; background: transparent; padding: 0; margin-top: 2px; }
+
+    .rec-bottom { display: flex; gap: 0; margin-top: 12px; }
+    .rec-emitente { flex: 1; padding-right: 20px; }
+    .rec-date-assin { width: 260px; display: flex; flex-direction: column; gap: 8px; }
+    .rec-date { font-size: .88rem; color: #333; display: flex; align-items: center; gap: 4px;
+                flex-wrap: wrap; border-bottom: 1px solid #1a5fa8; padding-bottom: 4px; }
+    .rec-date input { border: none; border-bottom: 1px solid #aaa; outline: none;
+                      font-size: .88rem; background: transparent; }
+    .rec-date .city { width: 110px; }
+    .rec-date .day  { width: 30px; text-align:center; }
+    .rec-date .month{ width: 90px; }
+    .rec-date .year { width: 50px; }
+    .rec-firma { font-size: .82rem; color: #555; text-align: center; font-style: italic;
+                 line-height: 1.3; border-bottom: 1px solid #1a5fa8; padding-bottom: 8px; }
+    .rec-assin { border-top: 1px solid #1a5fa8; margin-top: 6px; padding-top: 4px;
+                 font-size: .7rem; color: #1a5fa8; text-align: center; font-weight: 700;
+                 text-transform: uppercase; }
+    .rec-valor-bottom { width: 160px; border: 2px solid #1a5fa8; border-radius: 4px; margin-left: 12px;
+                        display: flex; flex-direction: column; align-items: center; justify-content: center;
+                        padding: 10px; background: #eaf1fb; align-self: flex-end; }
+    .rec-valor-bottom .lbl { font-size: .7rem; color: #1a5fa8; font-weight: 700; text-transform: uppercase; }
+    .rec-valor-bottom input { border: none; outline: none; background: transparent; font-size: 1rem;
+                              font-weight: 700; color: #1a5fa8; text-align: center; width: 100%; }
+
+    @media print {
+      body { background: #fff; }
+      .btn-bar, .no-print { display: none !important; }
+      .recibo-wrap { margin: 0; max-width: 100%; }
+      input, textarea { color: #000 !important; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="recibo-wrap">
+
+  <div class="btn-bar no-print">
+    <button onclick="window.print()" class="btn btn-primary">
+      <i class="bi bi-printer me-1"></i> Imprimir / Salvar PDF
+    </button>
+    <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
+      <i class="bi bi-arrow-left me-1"></i> Voltar
+    </a>
+    <span class="text-muted small align-self-center ms-2">
+      Clique em "Imprimir" e escolha "Salvar como PDF" no navegador
+    </span>
+  </div>
+
+  <div class="recibo">
+
+    <div class="rec-header">
+      <div class="rec-title">Recibo</div>
+      <div class="rec-num">
+        N°&nbsp;<input id="rec_num" type="text" placeholder="001" style="width:70px">
+      </div>
+      <div class="rec-valor-box">
+        <span class="lbl">Valor</span>
+        <input id="rec_valor_topo" type="text" placeholder="R$ 0,00">
+      </div>
+    </div>
+
+    <div class="rec-body">
+
+      <div class="rec-row">
+        <span class="lbl">Recebi(emos) de</span>
+        <input type="text" id="rec_de" placeholder="Nome do pagador">
+      </div>
+
+      <div class="rec-row">
+        <span class="lbl">Endereço do pagador</span>
+        <input type="text" id="rec_end_pag" placeholder="Endereço completo">
+      </div>
+
+      <div class="rec-row">
+        <span class="lbl">CPF / CNPJ do pagador</span>
+        <input type="text" id="rec_doc_pag" placeholder="000.000.000-00">
+      </div>
+
+      <div class="rec-corr">
+        <div class="lbl">Correspondente a</div>
+        <textarea id="rec_corr" rows="2" placeholder="Descrição do serviço ou produto..."></textarea>
+      </div>
+
+      <div class="rec-bottom">
+
+        <div class="rec-emitente">
+          <div class="rec-row" style="margin-top:8px">
+            <span class="lbl">Emitente</span>
+            <input type="text" id="rec_emitente" placeholder="Nome ou razão social">
+          </div>
+          <div class="rec-row">
+            <span class="lbl">Endereço</span>
+            <input type="text" id="rec_end_emit" placeholder="Endereço do emitente">
+          </div>
+          <div class="rec-row">
+            <span class="lbl">CNPJ / CPF / RG</span>
+            <input type="text" id="rec_doc_emit" placeholder="00.000.000/0000-00">
+          </div>
+          <div class="rec-assin" style="margin-top:28px;border-top:1px solid #1a5fa8">
+            (Assinatura)
+          </div>
+        </div>
+
+        <div class="rec-date-assin">
+          <div class="rec-date">
+            <input class="city" type="text" id="rec_cidade" value="Anápolis-GO" placeholder="Cidade">,
+            <input class="day" type="text" id="rec_dia" placeholder="dd">
+            de
+            <input class="month" type="text" id="rec_mes" placeholder="mês">
+            de
+            <input class="year" type="text" id="rec_ano" placeholder="aaaa">
+          </div>
+          <div class="rec-firma">e para clareza firmo(amos) o presente.</div>
+          <div class="rec-valor-bottom">
+            <span class="lbl">Valor</span>
+            <input id="rec_valor_baixo" type="text" placeholder="R$ 0,00">
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+document.getElementById('rec_valor_topo').addEventListener('input', function() {
+  document.getElementById('rec_valor_baixo').value = this.value;
+});
+document.getElementById('rec_valor_baixo').addEventListener('input', function() {
+  document.getElementById('rec_valor_topo').value = this.value;
+});
+
+(function() {
+  var hoje = new Date();
+  var meses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+               'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  document.getElementById('rec_dia').value  = hoje.getDate();
+  document.getElementById('rec_mes').value  = meses[hoje.getMonth()];
+  document.getElementById('rec_ano').value  = hoje.getFullYear();
+})();
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

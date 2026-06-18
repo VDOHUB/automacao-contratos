@@ -185,11 +185,16 @@
   </div>
 </div>
 
+<input type="hidden" name="rascunho_id" value="{{ rascunho_id or '' }}">
+
 <div class="d-grid gap-2 d-md-flex justify-content-md-end">
   <a href="{{ url_for('selecionar_partes', tipo=tipo) }}" class="btn btn-outline-secondary">
     <i class="bi bi-arrow-left me-1"></i> Voltar
   </a>
-  <button type="submit" class="btn btn-primary btn-lg">
+  <button type="submit" name="action" value="rascunho" class="btn btn-outline-warning">
+    <i class="bi bi-floppy me-1"></i> Salvar Rascunho
+  </button>
+  <button type="submit" name="action" value="gerar" class="btn btn-primary btn-lg">
     <i class="bi bi-file-earmark-arrow-down me-1"></i> Gerar Contrato
   </button>
 </div>
