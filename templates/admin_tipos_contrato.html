@@ -13,10 +13,16 @@
       <div class="card-header fw-semibold">Adicionar / Atualizar Tipo</div>
       <div class="card-body">
         <p class="text-muted small mb-3">
-          Faça upload de um arquivo <strong>.docx</strong> já preparado com as variáveis Jinja2
-          (ex: <code>{{ "{{" }} nome_contratante {{ "}}" }}</code>).
-          O sistema usará este template ao gerar contratos deste tipo.
+          No Word, pinte de <strong style="color:red">vermelho</strong> os textos que devem ser substituídos.
+          O sistema converte automaticamente cada texto vermelho para a variável correspondente.
+          Veja a tabela de variáveis ao lado para saber os nomes corretos.
         </p>
+        <div class="alert alert-info py-2 small mb-3">
+          <strong>Exemplo:</strong> escreva <span style="color:red">nome_contratante</span> em vermelho
+          onde o nome do cliente deve aparecer. Para tabela de serviços, escreva
+          <span style="color:red">for s in servicos</span> em vermelho na primeira linha
+          e <span style="color:red">endfor</span> na última.
+        </div>
         <form method="post" action="{{ url_for('admin_novo_tipo_contrato') }}" enctype="multipart/form-data">
           <div class="mb-3">
             <label class="form-label">Chave (identificador único) *</label>

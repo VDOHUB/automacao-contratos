@@ -530,6 +530,99 @@ def listar_tipos_contrato() -> list[dict]:
     return resultado
 
 
+def processar_template_vermelho(modelo_bytes: bytes) -> bytes:
+    """
+    Converte um .docx onde textos em VERMELHO são marcadores de variável.
+
+    Convenção:
+      - Texto vermelho inline → {{ texto }}
+      - Linha de tabela com 'for s in servicos' em vermelho → {%tr for s in servicos %}
+      - Linha de tabela com 'endfor' em vermelho → {%tr endfor %}
+      - Células de dados: s.num, s.descricao, s.unidade, s.valor, s.prazo em vermelho
+
+    Detecta: w:color FF0000 / C00000 e w:highlight red.
+    """
+    import tempfile, os
+
+    with tempfile.NamedTemporaryFile(suffix=".docx", delete=False) as tmp:
+        tmp.write(modelo_bytes)
+        tmp_path = tmp.name
+
+    doc = Document(tmp_path)
+
+    _REDS = {"FF0000", "C00000", "FF0000"}
+
+    def _is_red(run) -> bool:
+        rPr = run._element.find(qn("w:rPr"))
+        if rPr is None:
+            return False
+        c = rPr.find(qn("w:color"))
+        if c is not None and c.get(qn("w:val"), "").upper() in _REDS:
+            return True
+        hl = rPr.find(qn("w:highlight"))
+        if hl is not None and hl.get(qn("w:val"), "").lower() == "red":
+            return True
+        return False
+
+    def _remove_red(run):
+        rPr = run._element.find(qn("w:rPr"))
+        if rPr is None:
+            return
+        for el in rPr.findall(qn("w:color")):
+            rPr.remove(el)
+        for el in rPr.findall(qn("w:highlight")):
+            rPr.remove(el)
+
+    def _red_text_of_para(para) -> str:
+        return "".join(r.text for r in para.runs if _is_red(r)).strip()
+
+    def _convert_para(para):
+        """Junta todos os runs vermelhos, converte para {{ var }}, limpa cor."""
+        red_runs = [r for r in para.runs if _is_red(r) and r.text.strip()]
+        if not red_runs:
+            return
+        # Concatena o texto vermelho no primeiro run e zera os demais
+        full = "".join(r.text for r in red_runs).strip()
+        red_runs[0].text = "{{ " + full + " }}"
+        _remove_red(red_runs[0])
+        for r in red_runs[1:]:
+            r.text = ""
+            _remove_red(r)
+
+    # Parágrafos fora de tabelas
+    for para in doc.paragraphs:
+        _convert_para(para)
+
+    # Tabelas
+    for tbl in doc.tables:
+        for row in tbl.rows:
+            if not row.cells:
+                continue
+            first_red = _red_text_of_para(row.cells[0].paragraphs[0]) if row.cells[0].paragraphs else ""
+            fl = first_red.lower()
+
+            if fl.startswith("for ") or fl == "endfor":
+                # Linha de controle do loop
+                tag = "{%tr " + first_red + " %}"
+                _set_cell_text(row.cells[0]._tc, tag)
+                for cell in row.cells[1:]:
+                    _set_cell_text(cell._tc, "")
+            else:
+                # Linha normal — converte células com texto vermelho
+                for cell in row.cells:
+                    for para in cell.paragraphs:
+                        _convert_para(para)
+
+    out_path = tmp_path.replace(".docx", "_processed.docx")
+    doc.save(out_path)
+    with open(out_path, "rb") as f:
+        result = f.read()
+
+    os.unlink(tmp_path)
+    os.unlink(out_path)
+    return result
+
+
 def gerar_contrato_dinamico(key: str, modelo_bytes: bytes, dados: dict, servicos: list[dict]) -> Path:
     """Gera contrato a partir de template .docx armazenado no banco (já com variáveis Jinja2)."""
     import tempfile

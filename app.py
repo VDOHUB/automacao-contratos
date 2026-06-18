@@ -857,9 +857,14 @@ def admin_novo_tipo_contrato():
     if not arquivo.filename.lower().endswith(".docx"):
         flash("O arquivo deve ser .docx.", "danger")
         return redirect(url_for("admin_tipos_contrato"))
-    modelo_bytes = arquivo.read()
+    modelo_bytes_raw = arquivo.read()
+    try:
+        modelo_bytes = cg.processar_template_vermelho(modelo_bytes_raw)
+    except Exception as e:
+        flash(f"Erro ao processar template: {e}", "danger")
+        return redirect(url_for("admin_tipos_contrato"))
     db.salvar_tipo_contrato(key, label, modelo_bytes)
-    flash(f"Tipo '{label}' salvo com sucesso!", "success")
+    flash(f"Tipo '{label}' salvo! Textos vermelhos convertidos para variáveis.", "success")
     return redirect(url_for("admin_tipos_contrato"))
 
 
