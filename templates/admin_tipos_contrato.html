@@ -67,13 +67,13 @@
             <tr><td><code>{{ "{{" }} cidade_assinatura {{ "}}" }}</code></td><td>Cidade da assinatura</td></tr>
             <tr><td><code>{{ "{{" }} data_assinatura {{ "}}" }}</code></td><td>Data da assinatura</td></tr>
             <tr><td colspan="2" class="table-light fw-semibold">Tabela de serviços (linha repetida)</td></tr>
-            <tr><td><code>{%tr for s in servicos %}</code></td><td>Início do loop (1ª linha da tabela)</td></tr>
+            <tr><td><code>{% raw %}{%tr for s in servicos %}{% endraw %}</code></td><td>Início do loop (1ª linha da tabela)</td></tr>
             <tr><td><code>{{ "{{" }} s.num {{ "}}" }}</code></td><td>Número do item</td></tr>
             <tr><td><code>{{ "{{" }} s.descricao {{ "}}" }}</code></td><td>Descrição do serviço</td></tr>
             <tr><td><code>{{ "{{" }} s.unidade {{ "}}" }}</code></td><td>Unidade de medida</td></tr>
             <tr><td><code>{{ "{{" }} s.valor {{ "}}" }}</code></td><td>Valor unitário</td></tr>
             <tr><td><code>{{ "{{" }} s.prazo {{ "}}" }}</code></td><td>Prazo do serviço</td></tr>
-            <tr><td><code>{%tr endfor %}</code></td><td>Fim do loop (última linha da tabela)</td></tr>
+            <tr><td><code>{% raw %}{%tr endfor %}{% endraw %}</code></td><td>Fim do loop (última linha da tabela)</td></tr>
           </tbody>
         </table>
       </div>
