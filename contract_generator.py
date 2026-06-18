@@ -532,33 +532,26 @@ def listar_tipos_contrato() -> list[dict]:
 
 def processar_template_vermelho(modelo_bytes: bytes) -> bytes:
     """
-    Converte um .docx onde textos em VERMELHO são marcadores de variável.
-
-    Convenção:
-      - Texto vermelho inline → {{ texto }}
-      - Linha de tabela com 'for s in servicos' em vermelho → {%tr for s in servicos %}
-      - Linha de tabela com 'endfor' em vermelho → {%tr endfor %}
-      - Células de dados: s.num, s.descricao, s.unidade, s.valor, s.prazo em vermelho
-
-    Detecta: w:color FF0000 / C00000 e w:highlight red.
+    Converte um .docx onde textos em VERMELHO são os dados que variam por contrato.
+    O usuário pinta o texto real (ex: "Cassio Antônio da Silva" em vermelho).
+    A IA identifica pelo contexto qual variável Jinja2 cada texto representa.
+    Tabelas com header "Item/Descrição/Unidade/Valor/Prazo" são convertidas
+    automaticamente para loop docxtpl ({%tr for s in servicos %}).
     """
-    import tempfile, os
+    import tempfile, os, json as _json
+    from groq import Groq as _Groq
 
-    with tempfile.NamedTemporaryFile(suffix=".docx", delete=False) as tmp:
-        tmp.write(modelo_bytes)
-        tmp_path = tmp.name
-
-    doc = Document(tmp_path)
-
-    _REDS = {"FF0000", "C00000", "FF0000"}
+    _REDS = {"FF0000", "C00000", "A50021", "FF0001"}
 
     def _is_red(run) -> bool:
         rPr = run._element.find(qn("w:rPr"))
         if rPr is None:
             return False
         c = rPr.find(qn("w:color"))
-        if c is not None and c.get(qn("w:val"), "").upper() in _REDS:
-            return True
+        if c is not None:
+            val = c.get(qn("w:val"), "").upper()
+            if val in _REDS or (val.startswith("FF") and val != "FFFFFF"):
+                return True
         hl = rPr.find(qn("w:highlight"))
         if hl is not None and hl.get(qn("w:val"), "").lower() == "red":
             return True
@@ -568,58 +561,157 @@ def processar_template_vermelho(modelo_bytes: bytes) -> bytes:
         rPr = run._element.find(qn("w:rPr"))
         if rPr is None:
             return
-        for el in rPr.findall(qn("w:color")):
-            rPr.remove(el)
-        for el in rPr.findall(qn("w:highlight")):
-            rPr.remove(el)
+        for el in list(rPr.findall(qn("w:color"))): rPr.remove(el)
+        for el in list(rPr.findall(qn("w:highlight"))): rPr.remove(el)
 
-    def _red_text_of_para(para) -> str:
+    def _para_red_text(para) -> str:
         return "".join(r.text for r in para.runs if _is_red(r)).strip()
 
-    def _convert_para(para):
-        """Junta todos os runs vermelhos, converte para {{ var }}, limpa cor."""
-        red_runs = [r for r in para.runs if _is_red(r) and r.text.strip()]
+    def _para_full_text(para) -> str:
+        return "".join(r.text for r in para.runs).strip()
+
+    with tempfile.NamedTemporaryFile(suffix=".docx", delete=False) as tmp:
+        tmp.write(modelo_bytes)
+        tmp_path = tmp.name
+
+    doc = Document(tmp_path)
+
+    # ── 1. Identificar tabelas de serviços e coletar amostras de texto vermelho ──
+    service_table_idxs = set()
+    samples = []  # [{red_text, context, is_upper}]
+
+    body_paras = list(doc.paragraphs)
+
+    for i, para in enumerate(body_paras):
+        red = _para_red_text(para)
+        if not red:
+            continue
+        ctx_prev = _para_full_text(body_paras[i - 1]) if i > 0 else ""
+        ctx_next = _para_full_text(body_paras[i + 1]) if i < len(body_paras) - 1 else ""
+        full = _para_full_text(para)
+        samples.append({
+            "red_text": red,
+            "context": f"{ctx_prev} | {full} | {ctx_next}",
+            "is_upper": red == red.upper() and red != red.lower(),
+        })
+
+    for tbl_idx, tbl in enumerate(doc.tables):
+        if not tbl.rows:
+            continue
+        header = " ".join(c.text.lower() for c in tbl.rows[0].cells)
+        if any(w in header for w in ("item", "descriç", "serviç", "unidade")):
+            service_table_idxs.add(tbl_idx)
+            continue
+        for row in tbl.rows:
+            for cell in row.cells:
+                for para in cell.paragraphs:
+                    red = _para_red_text(para)
+                    if not red:
+                        continue
+                    full = _para_full_text(para)
+                    samples.append({
+                        "red_text": red,
+                        "context": full,
+                        "is_upper": red == red.upper() and red != red.lower(),
+                    })
+
+    # ── 2. Pedir ao Groq o mapeamento texto → variável ──
+    VARIAVEIS = (
+        "nome_contratante: nome completo do contratante (cliente, pessoa física)\n"
+        "cpf_contratante: CPF do contratante (formato 000.000.000-00)\n"
+        "rg_contratante: número do RG do contratante\n"
+        "uf_rg_contratante: estado emissor do RG (ex: GO)\n"
+        "nacionalidade_contratante: nacionalidade (ex: brasileiro(a))\n"
+        "estado_civil_contratante: estado civil (ex: solteiro(a), casado(a))\n"
+        "profissao_contratante: profissão do contratante\n"
+        "logradouro_contratante: rua e número do endereço do contratante\n"
+        "complemento_contratante: complemento do endereço do contratante\n"
+        "nome_executora: nome da empresa ou pessoa executora\n"
+        "cnpj_executora: CNPJ da executora (formato 00.000.000/0000-00)\n"
+        "cpf_executora: CPF da executora se pessoa física\n"
+        "endereco_executora: endereço da executora\n"
+        "data_inicio: data de início da obra (DD/MM/AAAA)\n"
+        "prazo_execucao: prazo de execução (ex: 6 semanas, 3 meses)\n"
+        "data_conclusao: data prevista de conclusão (DD/MM/AAAA)\n"
+        "valor_multa_fmt: valor da multa em R$ (ex: R$ 10.000,00)\n"
+        "valor_multa_extenso: valor da multa por extenso (ex: dez mil reais)\n"
+        "cidade_assinatura: cidade onde o contrato é assinado (ex: Anápolis-GO)\n"
+        "data_assinatura: data de assinatura por extenso (ex: 22 de Janeiro de 2026)\n"
+        "nome_contratante | upper: nome do contratante em MAIÚSCULAS\n"
+        "nome_executora | upper: nome da executora em MAIÚSCULAS\n"
+        "cnpj_executora (usado em maiúsculas junto com nome): use nome_executora | upper – cnpj_executora\n"
+    )
+
+    mapping = {}
+    if samples:
+        prompt = (
+            "Você analisa contratos de construção civil brasileiros.\n"
+            "Os textos abaixo foram marcados em VERMELHO no contrato — são dados que variam por contrato.\n"
+            "Mapeie cada texto vermelho para a variável correta da lista.\n\n"
+            f"VARIÁVEIS DISPONÍVEIS:\n{VARIAVEIS}\n\n"
+            "TEXTOS VERMELHOS COM CONTEXTO:\n"
+            + _json.dumps(samples, ensure_ascii=False, indent=2)
+            + "\n\nRetorne APENAS JSON: {\"texto_vermelho\": \"nome_variavel\", ...}\n"
+            "Use exatamente o texto vermelho como chave. "
+            "Se aparecer em MAIÚSCULAS, use a variável com '| upper'. "
+            "Se não souber, use 'DESCONHECIDO'."
+        )
+
+        try:
+            client_groq = _Groq(api_key=os.environ.get("GROQ_API_KEY"))
+            resp = client_groq.chat.completions.create(
+                model="meta-llama/llama-4-scout-17b-16e-instruct",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0,
+                max_tokens=2048,
+            )
+            raw = resp.choices[0].message.content.strip()
+            raw = re.sub(r"^```[a-z]*\n?", "", raw)
+            raw = re.sub(r"\n?```$", "", raw)
+            mapping = _json.loads(raw)
+        except Exception:
+            mapping = {}
+
+    # ── 3. Aplicar mapeamento no documento ──
+    def _apply_para(para):
+        red_runs = [r for r in para.runs if _is_red(r)]
         if not red_runs:
             return
-        # Concatena o texto vermelho no primeiro run e zera os demais
-        full = "".join(r.text for r in red_runs).strip()
-        red_runs[0].text = "{{ " + full + " }}"
+        red_text = "".join(r.text for r in red_runs).strip()
+        var_name = mapping.get(red_text, red_text)
+        replacement = "{{ " + var_name + " }}"
+        red_runs[0].text = replacement
         _remove_red(red_runs[0])
         for r in red_runs[1:]:
             r.text = ""
             _remove_red(r)
 
-    # Parágrafos fora de tabelas
     for para in doc.paragraphs:
-        _convert_para(para)
+        _apply_para(para)
 
-    # Tabelas
-    for tbl in doc.tables:
+    for tbl_idx, tbl in enumerate(doc.tables):
+        if tbl_idx in service_table_idxs:
+            continue  # tratada pelo _setup_tabelas_servicos abaixo
         for row in tbl.rows:
-            if not row.cells:
-                continue
-            first_red = _red_text_of_para(row.cells[0].paragraphs[0]) if row.cells[0].paragraphs else ""
-            fl = first_red.lower()
+            for cell in row.cells:
+                for para in cell.paragraphs:
+                    _apply_para(para)
 
-            if fl.startswith("for ") or fl == "endfor":
-                # Linha de controle do loop
-                tag = "{%tr " + first_red + " %}"
-                _set_cell_text(row.cells[0]._tc, tag)
-                for cell in row.cells[1:]:
-                    _set_cell_text(cell._tc, "")
-            else:
-                # Linha normal — converte células com texto vermelho
-                for cell in row.cells:
-                    for para in cell.paragraphs:
-                        _convert_para(para)
+    # ── 4. Processar tabelas de serviços (loop docxtpl) ──
+    _setup_tabelas_servicos(doc)
+    _remove_red_highlights(doc)
 
     out_path = tmp_path.replace(".docx", "_processed.docx")
     doc.save(out_path)
     with open(out_path, "rb") as f:
         result = f.read()
 
-    os.unlink(tmp_path)
-    os.unlink(out_path)
+    try:
+        os.unlink(tmp_path)
+        os.unlink(out_path)
+    except Exception:
+        pass
+
     return result
 
 

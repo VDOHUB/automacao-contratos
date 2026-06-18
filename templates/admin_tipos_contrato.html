@@ -13,15 +13,18 @@
       <div class="card-header fw-semibold">Adicionar / Atualizar Tipo</div>
       <div class="card-body">
         <p class="text-muted small mb-3">
-          No Word, pinte de <strong style="color:red">vermelho</strong> os textos que devem ser substituídos.
-          O sistema converte automaticamente cada texto vermelho para a variável correspondente.
-          Veja a tabela de variáveis ao lado para saber os nomes corretos.
+          Pegue um contrato existente no Word, <strong style="color:red">pinte de vermelho</strong>
+          os dados que variam de contrato para contrato (nome do cliente, CPF, datas, valores, etc.).
+          O sistema usa inteligência artificial para identificar o que cada texto vermelho representa
+          e monta o template automaticamente.
         </p>
         <div class="alert alert-info py-2 small mb-3">
-          <strong>Exemplo:</strong> escreva <span style="color:red">nome_contratante</span> em vermelho
-          onde o nome do cliente deve aparecer. Para tabela de serviços, escreva
-          <span style="color:red">for s in servicos</span> em vermelho na primeira linha
-          e <span style="color:red">endfor</span> na última.
+          <i class="bi bi-lightbulb me-1"></i>
+          <strong>Como funciona:</strong> se você pintar "Cassio Antônio da Silva" de vermelho,
+          a IA reconhece pelo contexto que é o nome do contratante e substitui por
+          <code>{{ "{{" }} nome_contratante {{ "}}" }}</code>.
+          Tabelas de serviços com cabeçalho "Item / Descrição / Unidade / Valor / Prazo"
+          são convertidas automaticamente para loop de serviços.
         </div>
         <form method="post" action="{{ url_for('admin_novo_tipo_contrato') }}" enctype="multipart/form-data">
           <div class="mb-3">
